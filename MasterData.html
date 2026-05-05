@@ -1,0 +1,393 @@
+<!-- MasterData.html — 5 Tab CRUD: Cabang, Karyawan, Part, Dropdown, Config/Users -->
+<script>
+let masterDataCache = {};
+
+async function loadMasterData() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">🗂️ Master Data</h1><p class="page-subtitle">Kelola data master sistem</p></div>
+      <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+    </div>
+    <div class="tabs" id="masterTabs">
+      <div class="tab active" data-tab="cabang" onclick="switchMasterTab('cabang')">🏢 Cabang</div>
+      <div class="tab" data-tab="karyawan" onclick="switchMasterTab('karyawan')">👥 Karyawan</div>
+      <div class="tab" data-tab="part" onclick="switchMasterTab('part')">🔧 Part/Stok</div>
+      <div class="tab" data-tab="dropdown" onclick="switchMasterTab('dropdown')">📋 Dropdown</div>
+      <div class="tab" data-tab="config" onclick="switchMasterTab('config')">⚙️ Config</div>
+      ${Session.hasPermission('users')?'<div class="tab" data-tab="users" onclick="switchMasterTab(\'users\')">👤 Users</div>':''}
+    </div>
+    <div id="masterTabContent"></div>
+    <div class="modal-overlay" id="masterModal">
+      <div class="modal"><div class="modal-header"><h3 class="modal-title" id="masterModalTitle">Form</h3>
+        <button class="modal-close" onclick="Modal.hide('masterModal')">&times;</button></div>
+        <div class="modal-body" id="masterModalBody"></div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="Modal.hide('masterModal')">Batal</button>
+          <button class="btn btn-primary" id="masterModalSave" onclick="saveMasterForm()">💾 Simpan</button></div>
+      </div>
+    </div>`;
+  Loading.show('Memuat data...');
+  try {
+    masterDataCache = await API.call('getMasterDataFormData', cab==='SEMUA'?'':cab);
+    switchMasterTab('cabang');
+  } catch(e) { Toast.error('Gagal memuat: '+e.message); }
+  Loading.hide();
+}
+
+function switchMasterTab(tab) {
+  document.querySelectorAll('#masterTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab===tab));
+  const tc = document.getElementById('masterTabContent');
+  if(tab==='cabang') renderCabangTab(tc);
+  else if(tab==='karyawan') renderKaryawanTab(tc);
+  else if(tab==='part') renderPartTab(tc);
+  else if(tab==='dropdown') renderDropdownTab(tc);
+  else if(tab==='config') renderConfigTab(tc);
+  else if(tab==='users') renderUsersTab(tc);
+}
+
+// CABANG TAB
+function renderCabangTab(tc) {
+  const data = masterDataCache.cabangList||[];
+  tc.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">🏢 Daftar Cabang</h3>
+    <button class="btn btn-sm btn-primary" onclick="openMasterForm('cabang')">+ Tambah</button></div>
+    <div class="table-container"><table class="data-table"><thead><tr><th>ID</th><th>Nama</th><th>Alamat</th><th>Telepon</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+    ${data.map(r => `<tr><td>${r.ID_CABANG}</td><td>${r.NAMA_CABANG}</td><td>${r.ALAMAT||'-'}</td><td>${r.TELEPON||'-'}</td><td>${getStatusBadge(r.STATUS)}</td>
+    <td><button class="btn btn-sm btn-outline" onclick="openMasterForm('cabang',${JSON.stringify(r).replace(/"/g,'&quot;')})">✏️</button>
+    <button class="btn btn-sm btn-outline" style="color:var(--accent-red)" onclick="deleteMasterItem('cabang','${r.ID_CABANG}')">🗑️</button></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+// KARYAWAN TAB
+function renderKaryawanTab(tc) {
+  const data = masterDataCache.karyawanList||[];
+  tc.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">👥 Daftar Karyawan</h3>
+    <button class="btn btn-sm btn-primary" onclick="openMasterForm('karyawan')">+ Tambah</button></div>
+    <div class="table-container"><table class="data-table"><thead><tr><th>ID</th><th>Nama</th><th>Peran</th><th>Cabang</th><th>Telepon</th><th>Komisi%</th><th>Aksi</th></tr></thead><tbody>
+    ${data.map(r => `<tr><td>${r.id}</td><td>${r.nama}</td><td>${r.peran}</td><td>${r.cabang}</td><td>${r.telepon||'-'}</td><td>${r.komisi||0}%</td>
+    <td><button class="btn btn-sm btn-outline" onclick='openMasterForm("karyawan",${JSON.stringify(r)})'>✏️</button>
+    <button class="btn btn-sm btn-outline" style="color:var(--accent-red)" onclick="deleteMasterItem('karyawan','${r.id}')">🗑️</button></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+// PART TAB
+function renderPartTab(tc) {
+  const data = masterDataCache.stokList||[];
+  tc.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">🔧 Stok Barang</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-primary" onclick="openMasterForm('part')">+ Tambah Baru</button>
+      <button class="btn btn-sm btn-outline" onclick="openImportPersamaanModal()" title="Upload CSV untuk mengisi persamaan barang massal">📥 Import Persamaan CSV</button>
+      <button class="btn btn-sm btn-outline" onclick="downloadTemplatePersamaan()" title="Download template CSV">📄 Template CSV</button>
+    </div></div>
+    <div class="form-group" style="max-width:300px;margin-bottom:12px"><input type="text" class="form-control" placeholder="🔍 Cari nama/persamaan..." oninput="filterPartTable(this.value)"></div>
+    <div class="table-container"><table class="data-table" id="partMasterTable"><thead><tr><th>ID</th><th>Jenis</th><th>Nama</th><th>Persamaan</th><th>Kategori</th><th>Merk</th><th>Supplier</th><th>Cabang</th><th>Stok</th><th>H.Beli</th><th>H.Jual</th><th>Aksi</th></tr></thead><tbody>
+    ${data.map(r => `<tr><td style="font-size:11px">${r.id}</td><td>${r.jenisBarang||'-'}</td><td>${r.nama}</td>
+    <td style="font-size:11px;color:var(--accent-blue);max-width:120px;word-break:break-word">${r.persamaan||'-'}</td>
+    <td>${r.subKategori||'-'}</td><td>${r.merkBarang||'-'}</td><td>${r.supplier||'-'}</td><td>${r.cabang}</td>
+    <td style="font-weight:600;color:${r.stok<=3?'var(--accent-red)':'var(--text-primary)'}">${r.stok}</td><td>${formatRupiah(r.hargaBeli)}</td><td>${formatRupiah(r.hargaJual)}</td>
+    <td><button class="btn btn-sm btn-outline" onclick='openMasterForm("part",${JSON.stringify(r)})'>✏️</button>
+    <button class="btn btn-sm btn-outline" style="color:var(--accent-red)" onclick="deleteMasterItem('part','${r.id}')">🗑️</button></td></tr>`).join('')}
+    </tbody></table></div>
+  
+  <!-- Modal Import Persamaan -->
+  <div class="modal-overlay" id="importPersamaanModal">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header"><h3 class="modal-title">📥 Import Persamaan Barang (CSV)</h3>
+        <button class="modal-close" onclick="Modal.hide('importPersamaanModal')">×</button></div>
+      <div class="modal-body">
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Upload file CSV dengan 2 kolom: <code>NAMA_PART</code> dan <code>PERSAMAAN</code>.<br>Nama barang harus sama persis dengan yang ada di database. Sistem akan mengisi kolom persamaan secara otomatis.</p>
+        <p style="font-size:13px;margin-bottom:8px">Contoh isi CSV:</p>
+        <pre style="font-size:12px;background:var(--bg-glass);padding:10px;border-radius:6px">NAMA_PART,PERSAMAAN
+LCD Oppo A5S,"A7, A12, Realme C2"
+Baterai Samsung A50,"A30, A30s, A50s"</pre>
+        <div class="form-group" style="margin-top:16px">
+          <label class="form-label">Pilih File CSV</label>
+          <input type="file" id="persamaanCsvFile" accept=".csv,.txt" class="form-control">
+        </div>
+        <div id="importPersamaanResult"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Modal.hide('importPersamaanModal')">Batal</button>
+        <button class="btn btn-primary" onclick="processImportPersamaan()">🚀 Proses Import</button>
+      </div>
+    </div>
+  </div>
+  </div>`;
+}
+
+function filterPartTable(q) {
+  const rows = document.querySelectorAll('#partMasterTable tbody tr');
+  q = q.toUpperCase();
+  rows.forEach(r => { r.style.display = r.textContent.toUpperCase().includes(q) ? '' : 'none'; });
+}
+
+function openImportPersamaanModal() {
+  document.getElementById('importPersamaanResult').innerHTML = '';
+  document.getElementById('persamaanCsvFile').value = '';
+  Modal.show('importPersamaanModal');
+}
+
+function downloadTemplatePersamaan() {
+  const csv = 'NAMA_PART,PERSAMAAN\n"LCD Oppo A5S","A7, A12, Realme C2"\n"Baterai Samsung A50","A30, A30s, A50s"';
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Template_Persamaan_Barang.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function processImportPersamaan() {
+  const fileInput = document.getElementById('persamaanCsvFile');
+  const resultEl = document.getElementById('importPersamaanResult');
+  if (!fileInput.files || !fileInput.files[0]) {
+    Toast.warning('Pilih file CSV terlebih dahulu'); return;
+  }
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const csvText = e.target.result;
+    Loading.show('Memproses import persamaan...');
+    try {
+      const result = await API.call('importPersamaanCSV', csvText);
+      if (result.success) {
+        resultEl.innerHTML = `<div style="margin-top:12px;padding:12px;background:var(--bg-glass);border-radius:8px;border-left:4px solid var(--accent-emerald);font-size:13px">
+          ✅ <strong>${result.message}</strong><br>
+          <span style="color:var(--text-muted)">Total diproses: ${result.totalProses} baris | Berhasil update: ${result.totalUpdate} | Tidak ditemukan: ${result.totalTidakDitemukan}</span>
+        </div>`;
+        Toast.success('Import persamaan selesai!');
+        masterDataCache = await API.call('getMasterDataFormData', Session.getCabang()==='SEMUA'?'':Session.getCabang());
+      } else {
+        resultEl.innerHTML = `<div style="margin-top:12px;padding:12px;background:#fff0f0;border-radius:8px;border-left:4px solid var(--accent-red);font-size:13px">❌ ${result.message}</div>`;
+      }
+    } catch(err) { Toast.error('Error: '+err.message); }
+    Loading.hide();
+  };
+  reader.readAsText(file);
+}
+
+// DROPDOWN TAB — Manage all dropdown options
+function renderDropdownTab(tc) {
+  const dropdowns = [
+    {key:'MERK_HP', label:'📱 Merk HP', desc:'Merk HP untuk transaksi'},
+    {key:'JENIS_BARANG', label:'📦 Jenis Barang', desc:'Sparepart, Tool, Accessories'},
+    {key:'KATEGORI_SPAREPART', label:'🔧 Kategori Sparepart', desc:'LCD, Baterai, dll'},
+    {key:'KATEGORI_TOOL', label:'🛠️ Kategori Tool', desc:'Solder, Obeng, dll'},
+    {key:'KATEGORI_ACCESSORIES', label:'🎧 Kategori Accessories', desc:'Tempered Glass, dll'},
+    {key:'MERK_BARANG', label:'🏷️ Merk Barang', desc:'ORI, OEM, KW, dll'},
+    {key:'SUPPLIER_LIST', label:'🏭 Supplier', desc:'Daftar supplier'},
+    {key:'TIPE_PELANGGAN', label:'👥 Tipe Pelanggan', desc:'Umum, Langganan, VIP'}
+  ];
+  tc.innerHTML = `<div class="card"><h3 class="card-title" style="margin-bottom:16px">📋 Kelola Dropdown</h3>
+    <p style="color:var(--text-muted);margin-bottom:20px">Tambah/hapus opsi dropdown yang digunakan di semua form. Perubahan langsung berlaku.</p>
+    ${dropdowns.map(dd => {
+      var items = getConfigItems(dd.key);
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div><strong>${dd.label}</strong><span style="color:var(--text-muted);font-size:12px;margin-left:8px">${dd.desc}</span></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" id="ddItems_${dd.key}">
+          ${items.map(item => `<span class="badge" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;font-size:12px">${item}
+            <button onclick="removeDropdownItem('${dd.key}','${item.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--accent-red);cursor:pointer;font-size:14px;padding:0 2px">×</button></span>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px"><input type="text" class="form-control" id="ddInput_${dd.key}" placeholder="Tambah item baru..." style="max-width:250px;height:32px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="addDropdownItem('${dd.key}')" style="height:32px">+ Tambah</button></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function getConfigItems(key) {
+  var list = (masterDataCache.configList||[]).find(c => c.KEY === key);
+  if (!list || !list.VALUE) return [];
+  return list.VALUE.split(',').map(v => v.trim()).filter(v => v);
+}
+
+async function addDropdownItem(key) {
+  var input = document.getElementById('ddInput_' + key);
+  var val = input.value.trim().toUpperCase();
+  if (!val) { Toast.warning('Masukkan nama item'); return; }
+  var items = getConfigItems(key);
+  if (items.indexOf(val) !== -1) { Toast.warning('Item sudah ada'); return; }
+  items.push(val);
+  Loading.show('Menyimpan...');
+  try {
+    var result = await API.call('saveConfig', key, items.join(','));
+    if (result.success) {
+      Toast.success('Item ditambahkan');
+      input.value = '';
+      masterDataCache = await API.call('getMasterDataFormData', Session.getCabang()==='SEMUA'?'':Session.getCabang());
+      renderDropdownTab(document.getElementById('masterTabContent'));
+    } else Toast.error(result.message);
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+async function removeDropdownItem(key, item) {
+  if (!confirm('Hapus "'+item+'" dari daftar?')) return;
+  var items = getConfigItems(key).filter(v => v !== item);
+  Loading.show('Menyimpan...');
+  try {
+    var result = await API.call('saveConfig', key, items.join(','));
+    if (result.success) {
+      Toast.success('Item dihapus');
+      masterDataCache = await API.call('getMasterDataFormData', Session.getCabang()==='SEMUA'?'':Session.getCabang());
+      renderDropdownTab(document.getElementById('masterTabContent'));
+    } else Toast.error(result.message);
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+// CONFIG TAB
+function renderConfigTab(tc) {
+  const data = masterDataCache.configList||[];
+  tc.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">⚙️ Konfigurasi</h3></div>
+    <div class="table-container"><table class="data-table"><thead><tr><th>Key</th><th>Value</th><th>Deskripsi</th><th>Aksi</th></tr></thead><tbody>
+    ${data.map(r => `<tr><td style="font-weight:600">${r.KEY}</td><td><input type="text" class="form-control" value="${r.VALUE||''}" id="cfg_${r.KEY}" style="min-width:200px"></td>
+    <td style="font-size:12px;color:var(--text-muted)">${r.DESKRIPSI||''}</td>
+    <td><button class="btn btn-sm btn-success" onclick="saveConfigItem('${r.KEY}')">💾</button></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+async function saveConfigItem(key) {
+  const val = document.getElementById('cfg_'+key)?.value;
+  const result = await API.call('saveConfig', key, val);
+  if(result.success) Toast.success('Config disimpan'); else Toast.error(result.message);
+}
+
+// USERS TAB
+function renderUsersTab(tc) {
+  const data = masterDataCache.usersList||[];
+  tc.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">👤 Users</h3>
+    <button class="btn btn-sm btn-primary" onclick="openMasterForm('users')">+ Tambah</button></div>
+    <div class="table-container"><table class="data-table"><thead><tr><th>Username</th><th>Role</th><th>Cabang</th><th>Nama</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+    ${data.map(r => `<tr><td>${r.username||r.USERNAME}</td><td>${r.role||r.ROLE}</td><td>${r.cabang||r.CABANG}</td><td>${r.nama||r.NAMA}</td><td>${getStatusBadge(r.status||r.STATUS)}</td>
+    <td><button class="btn btn-sm btn-outline" onclick='openMasterForm("users",${JSON.stringify(r)})'>✏️</button>
+    <button class="btn btn-sm btn-outline" style="color:var(--accent-red)" onclick="deleteMasterItem('users','${r.username||r.USERNAME}')">🗑️</button></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+// MODAL FORMS
+let currentMasterType = '';
+let currentMasterEdit = null;
+
+function getMasterDropdownOpts(key) {
+  return getConfigItems(key);
+}
+
+function openMasterForm(type, editData) {
+  currentMasterType = type;
+  currentMasterEdit = editData || null;
+  const isEdit = !!editData;
+  document.getElementById('masterModalTitle').textContent = (isEdit?'Edit ':'Tambah ') + type.charAt(0).toUpperCase()+type.slice(1);
+
+  const body = document.getElementById('masterModalBody');
+  if(type==='cabang') {
+    body.innerHTML = `<div class="form-group"><label class="form-label required">ID Cabang</label><input type="text" class="form-control" id="mfId" value="${editData?.ID_CABANG||''}" ${isEdit?'readonly':''}></div>
+    <div class="form-group"><label class="form-label required">Nama</label><input type="text" class="form-control" id="mfNama" value="${editData?.NAMA_CABANG||''}"></div>
+    <div class="form-group"><label class="form-label">Alamat</label><input type="text" class="form-control" id="mfAlamat" value="${editData?.ALAMAT||''}"></div>
+    <div class="form-group"><label class="form-label">Telepon</label><input type="text" class="form-control" id="mfTelepon" value="${editData?.TELEPON||''}"></div>`;
+  } else if(type==='karyawan') {
+    body.innerHTML = `<div class="form-group"><label class="form-label required">Nama</label><input type="text" class="form-control" id="mfNama" value="${editData?.nama||''}"></div>
+    <div class="form-row"><div class="form-group"><label class="form-label required">Peran</label><select class="form-control" id="mfPeran"><option value="ADMIN" ${editData?.peran==='ADMIN'?'selected':''}>Admin (Bisa Edit/Hapus)</option><option value="ADMIN_NO_EDIT" ${editData?.peran==='ADMIN_NO_EDIT'?'selected':''}>Admin (Hanya Input)</option><option value="TEKNISI" ${editData?.peran==='TEKNISI'?'selected':''}>Teknisi</option><option value="OWNER" ${editData?.peran==='OWNER'?'selected':''}>Owner</option></select></div>
+    <div class="form-group"><label class="form-label required">Cabang</label><select class="form-control" id="mfCabang">${(masterDataCache.cabangList||[]).map(c=>`<option value="${c.ID_CABANG}" ${editData?.cabang===c.ID_CABANG?'selected':''}>${c.ID_CABANG}</option>`).join('')}</select></div></div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Telepon</label><input type="text" class="form-control" id="mfTelepon" value="${editData?.telepon||''}"></div>
+    <div class="form-group"><label class="form-label">Komisi %</label><input type="number" class="form-control" id="mfKomisi" value="${editData?.komisi||0}" min="0" max="100"></div></div>`;
+  } else if(type==='part') {
+    var jenisOpts = getMasterDropdownOpts('JENIS_BARANG').map(j=>`<option value="${j}" ${editData?.jenisBarang===j?'selected':''}>${j}</option>`).join('');
+    var merkOpts = getMasterDropdownOpts('MERK_BARANG').map(m=>`<option value="${m}" ${editData?.merkBarang===m?'selected':''}>${m}</option>`).join('');
+    var supOpts = (masterDataCache.supplierList||getMasterDropdownOpts('SUPPLIER_LIST')).map(s=>`<option value="${s}" ${editData?.supplier===s?'selected':''}>${s}</option>`).join('');
+    body.innerHTML = `<div class="form-row"><div class="form-group"><label class="form-label required">Jenis Barang</label><select class="form-control" id="mfJenis" onchange="onMasterPartJenisChange()"><option value="">— Pilih —</option>${jenisOpts}</select></div>
+    <div class="form-group"><label class="form-label required">Nama Barang</label><input type="text" class="form-control" id="mfNama" value="${editData?.nama||''}"></div></div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Sub-Kategori</label><select class="form-control" id="mfKategori"><option value="">— Pilih jenis dulu —</option></select></div>
+    <div class="form-group"><label class="form-label">Merk Barang</label><select class="form-control" id="mfMerk"><option value="">—</option>${merkOpts}</select></div></div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Supplier</label><select class="form-control" id="mfSupplier"><option value="">—</option>${supOpts}</select></div>
+    <div class="form-group"><label class="form-label required">Cabang</label><select class="form-control" id="mfCabang">${(masterDataCache.cabangList||[]).map(c=>`<option value="${c.ID_CABANG}" ${editData?.cabang===c.ID_CABANG?'selected':''}>${c.ID_CABANG}</option>`).join('')}</select></div></div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Stok</label><input type="number" class="form-control" id="mfStok" value="${editData?.stok||0}" min="0"></div>
+    <div class="form-group"><label class="form-label">Harga Beli</label><input type="text" class="form-control" id="mfHBeli" value="${formatRupiah(editData?.hargaBeli||0).replace('Rp ','')}"></div>
+    <div class="form-group"><label class="form-label">Harga Jual</label><input type="text" class="form-control" id="mfHJual" value="${formatRupiah(editData?.hargaJual||0).replace('Rp ','')}"></div></div>
+    <div class="form-group"><label class="form-label">Persamaan / Alias Tipe HP <span style="font-size:11px;color:var(--text-muted)">(Pisahkan dengan koma, contoh: A7, A12, Realme C2)</span></label>
+    <input type="text" class="form-control" id="mfPersamaan" value="${editData?.persamaan||''}" placeholder="Contoh: A7, A12, Realme C2, Realme 3"></div>`;
+    if (editData?.jenisBarang) { setTimeout(function(){ document.getElementById('mfJenis').value=editData.jenisBarang; onMasterPartJenisChange(); setTimeout(function(){ if(editData.subKategori) document.getElementById('mfKategori').value=editData.subKategori; },50); },50); }
+  } else if(type==='users') {
+    body.innerHTML = `<div class="form-group"><label class="form-label required">Username</label><input type="text" class="form-control" id="mfUsername" value="${editData?.username||editData?.USERNAME||''}" ${isEdit?'readonly':''}></div>
+    <div class="form-group"><label class="form-label ${isEdit?'':'required'}">Password</label><input type="password" class="form-control" id="mfPassword" placeholder="${isEdit?'Kosongkan jika tidak berubah':''}"></div>
+    <div class="form-row"><div class="form-group"><label class="form-label required">Role</label><select class="form-control" id="mfRole"><option value="ADMIN">Admin (Bisa Edit/Hapus)</option><option value="ADMIN_NO_EDIT">Admin (Hanya Input)</option><option value="TEKNISI">Teknisi</option><option value="OWNER">Owner</option></select></div>
+    <div class="form-group"><label class="form-label required">Cabang</label><select class="form-control" id="mfUserCabang"><option value="SEMUA">SEMUA</option>${(masterDataCache.cabangList||[]).map(c=>`<option value="${c.ID_CABANG}">${c.ID_CABANG}</option>`).join('')}</select></div></div>
+    <div class="form-group"><label class="form-label required">Nama Lengkap</label><input type="text" class="form-control" id="mfNamaUser" value="${editData?.nama||editData?.NAMA||''}"></div>`;
+    if(isEdit) { document.getElementById('mfRole').value=editData?.role||editData?.ROLE||'ADMIN'; document.getElementById('mfUserCabang').value=editData?.cabang||editData?.CABANG||'SEMUA'; }
+  }
+  Modal.show('masterModal');
+  if(type==='part') {
+    setTimeout(function() {
+      setupRupiahInput('mfHBeli');
+      setupRupiahInput('mfHJual');
+    }, 100);
+  }
+}
+
+function onMasterPartJenisChange() {
+  var jenis = document.getElementById('mfJenis').value;
+  var katSel = document.getElementById('mfKategori');
+  var kats = [];
+  if (jenis === 'SPAREPART') kats = getMasterDropdownOpts('KATEGORI_SPAREPART');
+  else if (jenis === 'TOOL') kats = getMasterDropdownOpts('KATEGORI_TOOL');
+  else if (jenis === 'ACCESSORIES') kats = getMasterDropdownOpts('KATEGORI_ACCESSORIES');
+  katSel.innerHTML = '<option value="">— Pilih —</option>' + kats.map(k => `<option value="${k}">${k}</option>`).join('');
+}
+
+async function saveMasterForm() {
+  Loading.show('Menyimpan...');
+  try {
+    let result;
+    const isEdit = !!currentMasterEdit;
+    if(currentMasterType==='cabang') {
+      result = await API.call('saveCabang', {isEdit, rowIndex:currentMasterEdit?._rowIndex, id:document.getElementById('mfId').value,
+        nama:document.getElementById('mfNama').value, alamat:document.getElementById('mfAlamat').value,
+        telepon:document.getElementById('mfTelepon').value, status:isEdit?currentMasterEdit.STATUS:'AKTIF', createdBy:Session.getUsername()});
+    } else if(currentMasterType==='karyawan') {
+      result = await API.call('saveKaryawan', {isEdit, rowIndex:currentMasterEdit?._rowIndex,
+        nama:document.getElementById('mfNama').value, peran:document.getElementById('mfPeran').value,
+        cabang:document.getElementById('mfCabang').value, telepon:document.getElementById('mfTelepon').value,
+        komisi:document.getElementById('mfKomisi').value, createdBy:Session.getUsername()});
+    } else if(currentMasterType==='part') {
+      result = await API.call('savePart', {isEdit, rowIndex:currentMasterEdit?._rowIndex,
+        jenisBarang:document.getElementById('mfJenis').value,
+        nama:document.getElementById('mfNama').value, subKategori:document.getElementById('mfKategori').value,
+        merkBarang:document.getElementById('mfMerk').value, supplier:document.getElementById('mfSupplier').value,
+        cabang:document.getElementById('mfCabang').value, stok:document.getElementById('mfStok').value,
+        hargaBeli:getRupiahValue('mfHBeli'), hargaJual:getRupiahValue('mfHJual'),
+        persamaan:document.getElementById('mfPersamaan')?.value||'',
+        createdBy:Session.getUsername()});
+    } else if(currentMasterType==='users') {
+      result = await API.call('saveUser', {isEdit, username:document.getElementById('mfUsername').value,
+        password:document.getElementById('mfPassword').value, role:document.getElementById('mfRole').value,
+        cabang:document.getElementById('mfUserCabang').value, nama:document.getElementById('mfNamaUser').value});
+    }
+    if(result?.success) { Toast.success(result.message); Modal.hide('masterModal');
+      masterDataCache = await API.call('getMasterDataFormData', Session.getCabang()==='SEMUA'?'':Session.getCabang());
+      switchMasterTab(currentMasterType);
+    } else Toast.error(result?.message||'Gagal menyimpan');
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+async function deleteMasterItem(type, id) {
+  const isConfirmed = await Modal.confirm('Konfirmasi Hapus', 'Apakah Anda yakin ingin menonaktifkan data ini?');
+  if(!isConfirmed) return;
+  Loading.show('Menghapus...');
+  try {
+    let result;
+    if(type==='cabang') result = await API.call('deleteCabang', id);
+    else if(type==='karyawan') result = await API.call('deleteKaryawan', id);
+    else if(type==='part') result = await API.call('deletePart', id);
+    else if(type==='users') result = await API.call('deleteUser', id);
+    
+    if(result?.success) { 
+      Toast.success(result.message);
+      masterDataCache = await API.call('getMasterDataFormData', Session.getCabang()==='SEMUA'?'':Session.getCabang());
+      switchMasterTab(type);
+    } else Toast.error(result?.message||'Gagal menghapus');
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+</script>

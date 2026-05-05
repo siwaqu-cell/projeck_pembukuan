@@ -1,0 +1,144 @@
+<!-- BatalTransaksi.html — Modul Pembatalan Transaksi -->
+<style>
+  .batal-panel {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .batal-result {
+    margin-top: 24px;
+    padding: 20px;
+    border: 1px solid var(--accent-red);
+    border-radius: var(--radius-md);
+    background: rgba(239, 68, 68, 0.05);
+    display: none; /* hidden by default */
+  }
+  .batal-item-list {
+    margin: 15px 0;
+    padding: 15px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+  }
+</style>
+
+<script>
+let currentBatalData = null;
+
+async function loadBatalTransaksi() {
+  const content = document.getElementById('pageContent');
+  
+  if (Session.getRole() !== 'OWNER') {
+    content.innerHTML = `
+      <div class="card" style="text-align:center; padding: 50px;">
+        <div style="font-size: 48px; margin-bottom:20px;">🔒</div>
+        <h2>Akses Ditolak</h2>
+        <p class="text-muted">Hanya OWNER yang diizinkan untuk membatalkan transaksi.</p>
+      </div>`;
+    return;
+  }
+  
+  content.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">⚠️ Pembatalan Transaksi</h1>
+        <p class="page-subtitle">Pembalikan stok dan kas untuk transaksi yang salah input</p>
+      </div>
+    </div>
+
+    <div class="card batal-panel">
+      <div class="form-group">
+        <label class="form-label">Masukkan ID Transaksi / Penjualan</label>
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="batalSearchId" class="form-control" placeholder="Contoh: TRX-2605... atau PNJ-..." autocomplete="off">
+          <button class="btn btn-primary" onclick="searchTransaksiBatal()">🔍 Cari</button>
+        </div>
+      </div>
+
+      <div id="batalResultPanel" class="batal-result">
+        <h3 style="color:var(--accent-red); margin-bottom:15px;">Data Transaksi Ditemukan</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:14px; margin-bottom:15px;">
+          <div><strong>ID:</strong> <span id="btlId"></span></div>
+          <div><strong>Tanggal:</strong> <span id="btlTgl"></span></div>
+          <div><strong>Pelanggan:</strong> <span id="btlPelanggan"></span></div>
+          <div><strong>Cabang:</strong> <span id="btlCabang"></span></div>
+          <div><strong>Status:</strong> <span id="btlStatus" style="font-weight:bold; color:var(--accent-warning)"></span></div>
+          <div><strong>Total:</strong> <span id="btlTotal" style="font-weight:bold;"></span></div>
+        </div>
+        
+        <strong>Rincian Part / Barang:</strong>
+        <div class="batal-item-list" id="btlItems"></div>
+        
+        <div class="alert" style="background:rgba(239, 68, 68, 0.1); border-left:4px solid var(--accent-red); padding:10px; margin-bottom:20px; font-size:13px;">
+          <strong>PERINGATAN:</strong> Membatalkan transaksi ini akan mengembalikan stok barang ke gudang dan mencatat pengeluaran kas pembalik. Tindakan ini tidak bisa di-undo!
+        </div>
+        
+        <button class="btn btn-danger" style="width:100%" onclick="executePembatalan()">🚨 VOID / BATALKAN TRANSAKSI INI</button>
+      </div>
+    </div>
+  `;
+}
+
+async function searchTransaksiBatal() {
+  const id = document.getElementById('batalSearchId').value.trim();
+  if (!id) { Toast.warning('Masukkan ID Transaksi'); return; }
+  
+  Loading.show('Mencari data...');
+  try {
+    const res = await API.call('getTransaksiUntukBatal', id);
+    if (res.success) {
+      currentBatalData = res.data;
+      
+      document.getElementById('btlId').textContent = currentBatalData.id;
+      document.getElementById('btlTgl').textContent = currentBatalData.tanggal;
+      document.getElementById('btlPelanggan').textContent = currentBatalData.pelanggan;
+      document.getElementById('btlCabang').textContent = currentBatalData.cabang;
+      document.getElementById('btlStatus').textContent = currentBatalData.status;
+      document.getElementById('btlTotal').textContent = formatRupiah(currentBatalData.total);
+      
+      let itemsHtml = currentBatalData.parts.map(p => 
+        `<div>- ${p.nama} (${p.qty}x)</div>`
+      ).join('');
+      if (!itemsHtml) itemsHtml = '<div class="text-muted">Tidak ada part</div>';
+      document.getElementById('btlItems').innerHTML = itemsHtml;
+      
+      // Prevent canceling already canceled items
+      if (currentBatalData.status === 'BATAL' || currentBatalData.status === 'DIBATALKAN') {
+        Toast.error('Transaksi ini SUDAH dibatalkan sebelumnya!');
+        document.getElementById('batalResultPanel').style.display = 'none';
+      } else {
+        document.getElementById('batalResultPanel').style.display = 'block';
+        Toast.success('Data ditemukan');
+      }
+    } else {
+      Toast.error(res.message);
+      document.getElementById('batalResultPanel').style.display = 'none';
+    }
+  } catch(e) {
+    Toast.error('Error: ' + e.message);
+  }
+  Loading.hide();
+}
+
+async function executePembatalan() {
+  if (!currentBatalData) return;
+  
+  const confirm = await Modal.confirm('Void Transaksi?', `Anda yakin ingin MEMBATALKAN transaksi ${currentBatalData.id} secara permanen? Stok akan dikembalikan dan Laporan Kas akan diseimbangkan.`);
+  
+  if (!confirm) return;
+  
+  Loading.show('Memproses Pembatalan...');
+  try {
+    const res = await API.call('voidTransaksi', { id: currentBatalData.id, user: Session.getUsername() });
+    if (res.success) {
+      Toast.success('Transaksi Berhasil Dibatalkan!');
+      document.getElementById('batalResultPanel').style.display = 'none';
+      document.getElementById('batalSearchId').value = '';
+      currentBatalData = null;
+    } else {
+      Toast.error(res.message);
+    }
+  } catch(e) {
+    Toast.error('Gagal: ' + e.message);
+  }
+  Loading.hide();
+}
+</script>

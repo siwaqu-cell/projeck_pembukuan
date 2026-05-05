@@ -1,0 +1,166 @@
+<!-- LaporanKas.html — Cash Flow Report -->
+<script>
+async function loadLaporanKas() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">💰 Laporan Kas</h1><p class="page-subtitle">Kas masuk & keluar detail</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-warning" onclick="showPengeluaranModal()">💸 Input Pengeluaran</button>
+        <button class="btn btn-outline" onclick="exportToCSV('kasLaporanTable', 'Laporan_Kas_ServicePro')">📥 Export CSV</button>
+        <button class="btn btn-outline" onclick="refreshLaporanKas()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="printLaporan()">🖨️ Cetak</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label">Cabang</label>
+        <select class="form-control" id="kasFilterCab" onchange="refreshLaporanKas()"><option value="SEMUA">Semua</option></select></div>`:''}
+      <div class="form-group"><label class="form-label">Jenis</label>
+        <select class="form-control" id="kasFilterJenis" onchange="refreshLaporanKas()"><option value="SEMUA">Semua</option><option value="MASUK">Masuk</option><option value="KELUAR">Keluar</option></select></div>
+      <div class="form-group"><label class="form-label">Metode</label>
+        <select class="form-control" id="kasFilterMetode" onchange="refreshLaporanKas()"><option value="SEMUA">Semua</option><option value="CASH">Cash</option><option value="TRANSFER">Transfer</option><option value="BON">BON</option></select></div>
+      <div class="form-group"><label class="form-label">Dari</label>
+        <input type="date" class="form-control" id="kasFilterStart" value="${getMonthStartStr()}" onchange="refreshLaporanKas()"></div>
+      <div class="form-group"><label class="form-label">Sampai</label>
+        <input type="date" class="form-control" id="kasFilterEnd" value="${getTodayStr()}" onchange="refreshLaporanKas()"></div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi-card"><div class="kpi-label">Total Masuk</div><div class="kpi-value" id="kasMasukTotal" style="background:var(--gradient-success);-webkit-background-clip:text">Rp 0</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Keluar</div><div class="kpi-value" id="kasKeluarTotal" style="background:var(--gradient-danger);-webkit-background-clip:text">Rp 0</div></div>
+      <div class="kpi-card"><div class="kpi-label">Saldo</div><div class="kpi-value" id="kasSaldoTotal">Rp 0</div></div>
+    </div>
+    <div class="card"><div class="table-container" id="kasTableContainer"></div><div id="kasPagination"></div></div>
+    
+    <!-- Modal Pengeluaran -->
+    <div id="modalPengeluaran" class="modal">
+      <div class="modal-content" style="max-width:500px">
+        <div class="modal-header">
+          <h3 class="modal-title">💸 Input Pengeluaran Biaya Toko</h3>
+          <button class="btn-close" onclick="closePengeluaranModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label required">Tanggal Pengeluaran</label>
+            <input type="date" id="pengeluaranTgl" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Nominal Pengeluaran (Rp)</label>
+            <input type="number" id="pengeluaranJumlah" class="form-control" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Keterangan / Deskripsi</label>
+            <textarea id="pengeluaranKet" class="form-control" placeholder="Contoh: Bayar listrik, WiFi, Beli ATK..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Metode Bayar (Sumber Dana)</label>
+            <select id="pengeluaranMetode" class="form-control">
+              <option value="CASH">Laci Kasir (Cash)</option>
+              <option value="TRANSFER">Rekening Bank (Transfer)</option>
+              <option value="UANG_OWNER">Uang Pribadi Owner / Kas Pusat (Tidak potong saldo laci/mutasi cabang)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:12px">
+          <button class="btn btn-outline" onclick="closePengeluaranModal()">Batal</button>
+          <button class="btn btn-success" onclick="submitPengeluaran()">💾 Simpan Pengeluaran</button>
+        </div>
+      </div>
+    </div>`;
+
+  if(!Session.isCabangLocked()){try{const cl=await API.call('getCabangList');const sel=document.getElementById('kasFilterCab');
+    cl.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.id;sel.appendChild(o);});
+    if(sel) sel.value = Session.getActiveViewCabang();
+  }catch(e){}}
+  refreshLaporanKas();
+}
+
+let kasData = [];
+let kasPage = 1;
+
+async function refreshLaporanKas() {
+  const cabSel = document.getElementById('kasFilterCab');
+  if (cabSel && !Session.isCabangLocked()) {
+    Session.setActiveViewCabang(cabSel.value);
+  }
+  const cab = Session.getActiveViewCabang();
+  
+  if (typeof updateBranchStyle === 'function') updateBranchStyle(cab);
+  
+  const filter = {
+    jenis:document.getElementById('kasFilterJenis')?.value||'SEMUA',
+    metodeBayar:document.getElementById('kasFilterMetode')?.value||'SEMUA',
+    startDate:document.getElementById('kasFilterStart')?.value,
+    endDate:document.getElementById('kasFilterEnd')?.value
+  };
+  try {
+    const result = await API.call('getLaporanKas', cab==='SEMUA'?'':cab, filter);
+    kasData = result.data || [];
+    document.getElementById('kasMasukTotal').textContent = formatRupiah(result.summary?.masuk||0);
+    document.getElementById('kasKeluarTotal').textContent = formatRupiah(result.summary?.keluar||0);
+    document.getElementById('kasSaldoTotal').textContent = formatRupiah(result.summary?.saldo||0);
+    kasPage = 1;
+    renderKasTable();
+  } catch(e) { Toast.error('Error: '+e.message); }
+}
+
+function renderKasTable() {
+  const el = document.getElementById('kasTableContainer');
+  if(!kasData.length){el.innerHTML='<div class="empty-state"><p>Tidak ada data kas</p></div>';return;}
+  const paged = paginateData(kasData, kasPage, 25);
+  let html = '<table class="data-table" id="kasLaporanTable"><thead><tr><th>Tanggal</th><th>Cabang</th><th>Jenis</th><th>Metode</th><th>Kategori</th><th>Keterangan</th><th class="text-right">Jumlah</th></tr></thead><tbody>';
+  paged.items.forEach(k => {
+    const color = k.JENIS==='MASUK'?'var(--accent-emerald)':'var(--accent-red)';
+    html += `<tr><td>${formatDateShort(k.TANGGAL)}</td><td>${k.CABANG||'-'}</td><td style="color:${color};font-weight:600">${k.JENIS}</td><td>${k.METODE_BAYAR||'-'}</td><td style="font-size:12px">${k.KATEGORI||'-'}</td><td style="font-size:12px">${k.KETERANGAN||'-'}</td><td class="text-right" style="color:${color};font-weight:600">${formatRupiah(k.JUMLAH)}</td></tr>`;
+  });
+  el.innerHTML = html + '</tbody></table>';
+  renderPagination('kasPagination', kasPage, paged.totalPages, changeKasPage);
+}
+function changeKasPage(p) { kasPage = p; renderKasTable(); }
+
+function printLaporan() {
+  if (typeof clearPrintArea === 'function') clearPrintArea();
+  else { var el = document.getElementById('printAreaContainer'); if (el) el.innerHTML = ''; }
+  setTimeout(function() { window.print(); }, 150);
+}
+
+function showPengeluaranModal() {
+  document.getElementById('pengeluaranJumlah').value = '0';
+  document.getElementById('pengeluaranKet').value = '';
+  document.getElementById('pengeluaranTgl').value = getTodayStr();
+  document.getElementById('modalPengeluaran').style.display = 'flex';
+}
+function closePengeluaranModal() { document.getElementById('modalPengeluaran').style.display = 'none'; }
+
+async function submitPengeluaran() {
+  const jumlah = Number(document.getElementById('pengeluaranJumlah').value);
+  const ket = document.getElementById('pengeluaranKet').value.trim();
+  const metode = document.getElementById('pengeluaranMetode').value;
+  const tgl = document.getElementById('pengeluaranTgl').value;
+  
+  if (jumlah <= 0) { Toast.warning('Nominal harus lebih dari 0'); return; }
+  if (!ket) { Toast.warning('Keterangan tidak boleh kosong'); return; }
+  if (!tgl) { Toast.warning('Tanggal wajib diisi'); return; }
+  
+  Loading.show('Menyimpan...');
+  try {
+    const res = await API.call('savePengeluaran', {
+      cabang: Session.getCabang(),
+      jumlah: jumlah,
+      keterangan: ket,
+      metodeBayar: metode,
+      tanggal: tgl,
+      createdBy: Session.getUsername()
+    });
+    if (res.success) {
+      Toast.success(res.message);
+      closePengeluaranModal();
+      refreshLaporanKas();
+    } else {
+      Toast.error(res.message);
+    }
+  } catch(e) { Toast.error('Error: ' + e.message); }
+  Loading.hide();
+}
+</script>

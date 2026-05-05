@@ -1,0 +1,300 @@
+<!-- ReturnForm.html — Multi-item Return Form -->
+<script>
+let returnFormData = null;
+let rPartCounter = 0;
+
+async function loadReturn(customCab){
+  const content = document.getElementById('pageContent');
+  content.innerHTML = '<div class="empty-state"><div class="spinner" style="width:40px;height:40px;border-width:3px"></div><p style="margin-top:16px">Memuat form return...</p></div>';
+  try{
+    const cab = customCab || Session.getCabang();
+    returnFormData = await API.call('getPembelianFormData', cab === 'SEMUA' ? '' : cab);
+    renderReturnUI();
+  } catch(e) {
+    Toast.error('Gagal memuat data return: ' + e.message);
+    document.getElementById('pageContent').innerHTML = '<div class="empty-state"><p>Gagal memuat: ' + e.message + '</p><button class="btn btn-primary" onclick="loadReturn()">🔄 Coba Lagi</button></div>';
+  }
+}
+
+function renderReturnUI() {
+  const supOpts=(returnFormData?.supplierList||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+  const content=document.getElementById('pageContent');
+  content.innerHTML=`
+    <div class="page-header"><div><h1 class="page-title">↩️ Return Supplier</h1><p class="page-subtitle">Return barang ke supplier (Bisa lebih dari 1 barang)</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="resetReturnForm()">🔄 Reset</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+    <div class="card"><h3 class="card-title" style="margin-bottom:16px">📋 Info Return</h3>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label required">Supplier</label>
+          <select class="form-control" id="retSup" onchange="onRetSupChange()"><option value="">— Pilih Supplier —</option>${supOpts}</select></div>
+        ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label required">Cabang</label>
+          <select class="form-control" id="retCab" onchange="onRetCabChange()">${(returnFormData?.cabangList||[]).map(c=>`<option value="${c.id}">${c.id}</option>`).join('')}</select></div>`:''}
+        <div class="form-group"><label class="form-label">ID Pembelian Ref</label><input type="text" id="retIdBeli" class="form-control" placeholder="BLI-xxx (opsional)"></div>
+      </div>
+      <div class="form-group"><label class="form-label required">Alasan Return</label><textarea class="form-control" id="retAlasan" rows="1" placeholder="Misal: LCD Blank, Batre Kembung"></textarea></div>
+      <div class="form-group" style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <input type="checkbox" id="retPotong" style="width:18px;height:18px"><label for="retPotong" style="color:var(--text-secondary);font-size:14px;cursor:pointer">Potong dari hutang supplier ini</label>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="card-header"><h3 class="card-title">🔧 Barang yang di-Return</h3>
+        <button class="btn btn-sm btn-primary" onclick="addReturnRow()">+ Tambah Barang</button></div>
+      <div class="table-container" style="overflow:visible; min-height:250px;">
+        <table class="part-table">
+          <thead><tr>
+            <th style="width:100px">Jenis</th><th style="width:100px">Kategori</th><th style="width:90px">Merk</th>
+            <th style="min-width:200px">Nama Barang</th>
+            <th style="width:80px">Stok</th><th style="width:80px">Qty Ret</th><th style="width:110px">H.Beli</th><th style="width:40px"></th>
+          </tr></thead>
+          <tbody id="returnTableBody"></tbody>
+        </table>
+      </div>
+      
+      <div class="calc-panel" style="margin-top:20px">
+        <div class="calc-row total"><span class="calc-label">Total Nilai Return</span><span class="calc-value" id="calcTotalReturn">Rp 0</span></div>
+      </div>
+      
+      <button class="btn btn-primary btn-lg" style="margin-top:20px;width:100%" onclick="submitReturn()">💾 Simpan Return</button>
+    </div>`;
+    
+    // Inisialisasi awal, biarkan kosong dulu sampai supplier dipilih
+    document.getElementById('retSup').value = '';
+}
+
+function getRetCab(custom){return custom || (Session.isCabangLocked()?Session.getCabang():(document.getElementById('retCab')?.value||''));}
+
+function getRetStok(custom){
+  const c = getRetCab(custom);
+  const sup = document.getElementById('retSup')?.value;
+  if(!returnFormData||!returnFormData.stokList) return [];
+  
+  // Hanya ambil stok yang ada (stok>0) dan cocok dengan cabang & supplier
+  return returnFormData.stokList.filter(s => 
+    s.stok > 0 && 
+    (!c || c==='SEMUA' || s.cabang===c) && 
+    (!sup || s.supplier===sup)
+  );
+}
+
+async function onRetCabChange(){
+  const c=document.getElementById('retCab')?.value;
+  if(c){
+    Session.setActiveViewCabang(c);
+    if(typeof updateBranchStyle==='function') updateBranchStyle(c);
+    Loading.show('Memuat...');
+    try {
+      returnFormData = await API.call('getPembelianFormData', c);
+      onRetSupChange();
+    } catch(e) { Toast.error('Gagal memuat data: ' + e.message); }
+    Loading.hide();
+  }
+}
+
+function onRetSupChange() {
+  document.getElementById('returnTableBody').innerHTML = '';
+  rPartCounter = 0;
+  recalcReturn();
+  if (document.getElementById('retSup').value) {
+    addReturnRow();
+  }
+}
+
+function addReturnRow() {
+  rPartCounter++; 
+  const rid = rPartCounter;
+  const tbody = document.getElementById('returnTableBody');
+  const row = document.createElement('tr'); 
+  row.id = 'rRow_' + rid;
+  
+  const stok = getRetStok();
+  const jenisAll = [...new Set(stok.map(s=>s.jenisBarang).filter(v=>v))];
+  const katAll = [...new Set(stok.map(s=>s.subKategori).filter(v=>v))];
+  const merkAll = [...new Set(stok.map(s=>s.merkBarang).filter(v=>v))];
+
+  row.innerHTML = `
+    <td><select class="rJenis" onchange="onRetFilter(${rid})"><option value="">Semua</option>${jenisAll.map(j=>`<option value="${j}">${j}</option>`).join('')}</select></td>
+    <td><select class="rKat" onchange="onRetFilter(${rid})"><option value="">Semua</option>${katAll.map(k=>`<option value="${k}">${k}</option>`).join('')}</select></td>
+    <td><select class="rMerk" onchange="onRetFilter(${rid})"><option value="">Semua</option>${merkAll.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></td>
+    <td>
+      <div class="autocomplete-wrapper">
+        <input type="text" class="rNama" placeholder="🔍 Ketik/klik pilih..." onfocus="showRetNama(${rid})" oninput="showRetNama(${rid})">
+        <div class="autocomplete-list" id="rAC_${rid}"></div>
+      </div>
+    </td>
+    <td class="rStok text-center" style="font-weight:600;color:var(--text-secondary)">0</td>
+    <td><input type="number" class="rQty" value="1" min="1" max="0" oninput="recalcReturn()" style="width:100%"></td>
+    <td><input type="number" class="rHB" value="0" min="0" oninput="recalcReturn()" style="width:100%" readonly></td>
+    <td><button class="btn-remove-row" onclick="document.getElementById('rRow_${rid}').remove();recalcReturn()">✕</button></td>
+  `;
+  tbody.appendChild(row);
+}
+
+function onRetFilter(rid) {
+  const row = document.getElementById('rRow_'+rid);
+  if(!row) return;
+  const jV = row.querySelector('.rJenis').value;
+  const kV = row.querySelector('.rKat').value;
+  const mV = row.querySelector('.rMerk').value;
+
+  const stok = getRetStok().filter(s => (!jV||s.jenisBarang===jV) && (!kV||s.subKategori===kV) && (!mV||s.merkBarang===mV));
+
+  const kF = [...new Set(stok.map(s=>s.subKategori).filter(v=>v))];
+  const kSel = row.querySelector('.rKat'), kC = kSel.value;
+  kSel.innerHTML = '<option value="">Semua</option>' + kF.map(k=>`<option value="${k}"${k===kC?' selected':''}>${k}</option>`).join('');
+
+  const mF = [...new Set(stok.map(s=>s.merkBarang).filter(v=>v))];
+  const mSel = row.querySelector('.rMerk'), mC = mSel.value;
+  mSel.innerHTML = '<option value="">Semua</option>' + mF.map(m=>`<option value="${m}"${m===mC?' selected':''}>${m}</option>`).join('');
+  
+  if (stok.length === 1) retAutoFill(row, stok[0]);
+}
+
+function showRetNama(rid) {
+  const row = document.getElementById('rRow_'+rid);
+  if(!row) return;
+  const input = row.querySelector('.rNama'), acList = document.getElementById('rAC_'+rid);
+  const q = input.value.trim().toUpperCase();
+  const jV = row.querySelector('.rJenis').value, kV = row.querySelector('.rKat').value, mV = row.querySelector('.rMerk').value;
+  
+  const stok = getRetStok().filter(s => 
+    (!jV||s.jenisBarang===jV) && (!kV||s.subKategori===kV) && (!mV||s.merkBarang===mV) && 
+    (!q||s.nama.toUpperCase().indexOf(q)!==-1 || (s.persamaan&&s.persamaan.toUpperCase().indexOf(q)!==-1))
+  );
+
+  if(!stok.length){
+    acList.innerHTML='<div class="autocomplete-item" style="color:var(--text-muted)">Tidak ada barang/stok habis</div>';
+    acList.classList.add('show'); return;
+  }
+
+  const nMap={};
+  stok.forEach(s=>{
+    if(!nMap[s.nama]) nMap[s.nama]={nama:s.nama, items:[], ts:0};
+    nMap[s.nama].items.push(s); nMap[s.nama].ts += s.stok;
+  });
+  const res = Object.values(nMap).slice(0, 20);
+  
+  acList.innerHTML = res.map((r,i) => {
+    const info = r.items[0];
+    return `<div class="autocomplete-item" data-idx="${i}"><strong>${r.nama}</strong>
+      <span style="font-size:11px;color:var(--text-muted);margin-left:6px">${r.items.length>1?r.items.length+' varian | ':''}${info.jenisBarang||''} | ${info.merkBarang||''} | Stok: <span style="color:var(--accent-emerald)">${r.ts}</span></span></div>`;
+  }).join('');
+  acList.classList.add('show');
+
+  acList.querySelectorAll('.autocomplete-item[data-idx]').forEach((el,i) => {
+    el.onclick = () => {
+      if(i>=res.length) return;
+      const r = res[i];
+      input.value = r.nama;
+      acList.classList.remove('show');
+      
+      if(r.items.length === 1) {
+        retAutoFill(row, r.items[0]);
+      } else {
+        // Multi variant handling
+        const jL=[...new Set(r.items.map(s=>s.jenisBarang).filter(v=>v))];
+        const jSel=row.querySelector('.rJenis');
+        jSel.innerHTML='<option value="">— Pilih —</option>'+jL.map(j=>`<option value="${j}">${j}</option>`).join('');
+        if(jL.length===1) jSel.value=jL[0];
+        
+        const kL=[...new Set(r.items.map(s=>s.subKategori).filter(v=>v))];
+        const kSel=row.querySelector('.rKat');
+        kSel.innerHTML='<option value="">— Pilih —</option>'+kL.map(k=>`<option value="${k}">${k}</option>`).join('');
+        if(kL.length===1) kSel.value=kL[0];
+        
+        const mL=[...new Set(r.items.map(s=>s.merkBarang).filter(v=>v))];
+        const mSel=row.querySelector('.rMerk');
+        mSel.innerHTML='<option value="">— Pilih —</option>'+mL.map(m=>`<option value="${m}">${m}</option>`).join('');
+        if(mL.length===1) mSel.value=mL[0];
+        
+        const fM=r.items.filter(s=>
+          (!jSel.value||s.jenisBarang===jSel.value)&&(!kSel.value||s.subKategori===kSel.value)&&(!mSel.value||s.merkBarang===mSel.value));
+        if(fM.length===1) retAutoFill(row, fM[0]);
+      }
+    };
+  });
+}
+
+function retAutoFill(row, s) {
+  row.querySelector('.rJenis').innerHTML = `<option value="${s.jenisBarang||''}">${s.jenisBarang||'-'}</option>`;
+  row.querySelector('.rKat').innerHTML = `<option value="${s.subKategori||''}">${s.subKategori||'-'}</option>`;
+  row.querySelector('.rMerk').innerHTML = `<option value="${s.merkBarang||''}">${s.merkBarang||'-'}</option>`;
+  row.querySelector('.rNama').value = s.nama;
+  row.querySelector('.rStok').textContent = s.stok;
+  row.querySelector('.rStok').style.color = 'var(--accent-emerald)';
+  
+  const qtyInp = row.querySelector('.rQty');
+  qtyInp.max = s.stok;
+  if(Number(qtyInp.value) > s.stok) qtyInp.value = s.stok;
+  
+  row.querySelector('.rHB').value = s.hargaBeli || 0;
+  recalcReturn();
+}
+
+function getReturnRowsData() {
+  const items = [];
+  document.querySelectorAll('#returnTableBody tr').forEach(r => {
+    const nama = r.querySelector('.rNama')?.value?.trim();
+    if (!nama) return;
+    const qty = Number(r.querySelector('.rQty')?.value) || 0;
+    if (qty <= 0) return;
+    
+    items.push({
+      jenisBarang: r.querySelector('.rJenis')?.value || '',
+      namaPart: nama,
+      subKategori: r.querySelector('.rKat')?.value || '',
+      merkBarang: r.querySelector('.rMerk')?.value || '',
+      qty: qty,
+      hargaBeli: Number(r.querySelector('.rHB')?.value) || 0
+    });
+  });
+  return items;
+}
+
+function recalcReturn() {
+  const items = getReturnRowsData();
+  let total = 0;
+  items.forEach(p => { total += (p.hargaBeli * p.qty); });
+  document.getElementById('calcTotalReturn').textContent = formatRupiah(total);
+}
+
+function resetReturnForm() {
+  document.getElementById('retSup').value = '';
+  document.getElementById('retAlasan').value = '';
+  document.getElementById('retPotong').checked = false;
+  document.getElementById('retIdBeli').value = '';
+  onRetSupChange();
+}
+
+async function submitReturn() {
+  const data = {
+    supplier: document.getElementById('retSup')?.value,
+    cabang: getRetCab(),
+    alasan: document.getElementById('retAlasan')?.value?.trim(),
+    potongHutang: document.getElementById('retPotong')?.checked,
+    idBeliRef: document.getElementById('retIdBeli')?.value?.trim(),
+    createdBy: Session.getUsername(),
+    items: getReturnRowsData()
+  };
+  
+  if(!data.supplier || !data.alasan) { Toast.warning('Pilih supplier dan isi alasan return'); return; }
+  if(data.items.length === 0) { Toast.warning('Tambahkan minimal 1 barang untuk direturn dengan qty > 0'); return; }
+  
+  Loading.show('Menyimpan Return...');
+  try {
+    const r = await API.call('saveReturn', data);
+    if(r.success) {
+      Toast.success(r.message);
+      resetReturnForm();
+    } else {
+      Toast.error(r.message);
+    }
+  } catch(e) { Toast.error('Error: ' + e.message); }
+  Loading.hide();
+}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.autocomplete-wrapper'))document.querySelectorAll('.autocomplete-list').forEach(l=>l.classList.remove('show'));});
+</script>

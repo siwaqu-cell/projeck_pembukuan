@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ringkasan Fitur Lengkap ServicePro HP</title>
+<style>
+body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:30px}
+.wrap{max-width:1000px;margin:0 auto;background:white;border-radius:12px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+h1{color:#1a237e;text-align:center;font-size:32px;border-bottom:4px solid #3f51b5;padding-bottom:16px}
+h2{color:#283593;margin-top:40px;font-size:22px;border-left:5px solid #3f51b5;padding-left:12px}
+h3{color:#16a085;margin:20px 0 8px}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:14px}
+th{background:#3f51b5;color:white;padding:10px;text-align:left}
+td{border:1px solid #ddd;padding:9px}
+tr:nth-child(even){background:#f9f9f9}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold}
+.new{background:#e8f5e9;color:#2e7d32}
+.fix{background:#fff3e0;color:#e65100}
+.sec{background:#ffebee;color:#c62828}
+.center{text-align:center}
+@media print{body{padding:0;background:white}.wrap{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🚀 RINGKASAN FITUR LENGKAP<br><small style="font-size:18px;color:#5c6bc0">ServicePro HP v5.1 — Dari Awal Hingga Akhir</small></h1>
+
+<h2>📦 A. MODUL TRANSAKSI SERVIS</h2>
+<table>
+<tr><th>Fitur</th><th>Keterangan</th><th>Status</th></tr>
+<tr><td>➕ Input Transaksi Baru</td><td>Nama pelanggan, No WA, Tipe HP, Kerusakan, Teknisi, Cabang</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🔧 Tambah Part Servis</td><td>Pilih part dari stok + harga otomatis, bisa multi-part</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🛡️ Garansi Servis</td><td>Pilih jenis garansi (LCD, Baterai, Kamera, dll) saat input</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🖨️ Cetak Nota Otomatis</td><td>Nota langsung muncul setelah simpan transaksi (flush fix)</td><td><span class="badge fix">🔧 Diperbaiki</span></td></tr>
+<tr><td>🔄 Update Status Servis</td><td>Antri → Proses → Selesai → Diambil, dengan timestamp</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>✏️ Edit Transaksi</td><td>Ubah nama/HP/kerusakan tanpa hapus data lama</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🔩 Edit Part</td><td>Tambah/ubah/hapus part di tengah proses servis</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🗑️ Hapus/Void Transaksi</td><td>Stok dikembalikan, kas di-reverse (khusus Owner/Admin)</td><td><span class="badge sec">🔒 Owner Only</span></td></tr>
+<tr><td>💳 Ubah Metode Pembayaran</td><td>Ganti Cash/Transfer/BON setelah transaksi dibuat</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🖨️ Cetak Ulang Nota</td><td>Cetak nota kapan saja dari menu Update Status</td><td><span class="badge new">✅ Aktif</span></td></tr>
+</table>
+
+<h2>💰 B. MODUL KEUANGAN & KASIR</h2>
+<table>
+<tr><th>Fitur</th><th>Keterangan</th><th>Status</th></tr>
+<tr><td>🏦 Buka Laci (Modal Awal)</td><td>Kasir input modal awal sebelum mulai transaksi</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🏧 Tutup Toko / Setor Kas</td><td>Setor kas ke Owner, saldo dihitung otomatis</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>💸 Input Pengeluaran (OPEX)</td><td>Bayar listrik, konsumsi, ATK — otomatis potong laba</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>📒 Buku Kas Harian</td><td>Semua arus masuk & keluar per cabang per hari</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>📦 BON / Piutang Pelanggan</td><td>Transaksi belum lunas → masuk Buku Piutang, bukan Kas</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>✅ Lunasi BON</td><td>Bayar lunas → otomatis masuk Kas hari itu</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🏦 Kas Pusat (Owner)</td><td>Catat pembayaran hutang supplier ke Kas Pusat</td><td><span class="badge new">✅ Aktif</span></td></tr>
+</table>
+
+<h2>📦 C. MODUL STOK & INVENTORI</h2>
+<table>
+<tr><th>Fitur</th><th>Keterangan</th><th>Status</th></tr>
+<tr><td>🔍 Persamaan Nama Barang (Alias)</td><td>Ketik "A12" → menemukan "LCD Oppo A5S". Tampil di autocomplete semua form</td><td><span class="badge new">✅ BARU</span></td></tr>
+<tr><td>📥 Import Persamaan CSV</td><td>Upload CSV massal untuk mengisi persamaan ratusan barang sekaligus</td><td><span class="badge new">✅ BARU</span></td></tr>
+<tr><td>📉 Pemotongan Stok Otomatis</td><td>Stok berkurang otomatis saat part dipakai di servis</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>📦 Pembelian Part (Terima Barang)</td><td>Input pembelian dari supplier, stok bertambah, hutang tercatat</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>↩️ Return Supplier</td><td>Return part rusak/salah; opsi Cash Refund atau Potong Hutang</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>🔀 Transfer Cabang Multi-Item</td><td>Transfer puluhan barang sekaligus dengan sistem Keranjang (Cart)</td><td><span class="badge new">✅ BARU</span></td></tr>
+<tr><td>🏭 Gudang Pusat</td><td>Buat cabang "GUDANG" untuk tampung stok belum didistribusikan</td><td><span class="badge new">✅ Konsep Aktif</span></td></tr>
+<tr><td>📋 Stock Opname</td><td>Bandingkan stok sistem vs fisik, cetak laporan</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>📥 Import Stok Batch CSV</td><td>Upload CSV untuk input ratusan stok sekaligus + backdate tanggal</td><td><span class="badge new">✅ Aktif</span></td></tr>
+<tr><td>📋 Riwayat Pergerakan Part</td><td>Semua masuk/keluar/transfer tercatat dengan referensi ID</td><td><span class="badge new">✅ Aktif</span></td></tr>
+</table>
+
+<h2>📊 D. LAPORAN & ANALITIK</h2>
+<table>
+<tr><th>Laporan</th><th>Isi</th><th>Akses</th></tr>
+<tr><td>📊 Dashboard</td><td>KPI hari ini, omzet, stok rendah, transaksi pending, klik baris = buka detail</td><td>Owner + Admin</td></tr>
+<tr><td>💰 Laporan Kas</td><td>Semua arus kas, filter cabang/tanggal/metode, Export CSV</td><td>Owner + Admin</td></tr>
+<tr><td>📦 Laporan Stok</td><td>Stok aktif per cabang, indikator merah (habis), nilai modal total</td><td>Owner + Admin</td></tr>
+<tr><td>📋 Laporan Lengkap</td><td>KPI, kinerja teknisi, top pelanggan, transaksi rugi/nihil</td><td>Owner Only</td></tr>
+<tr><td>📈 Laporan Laba Rugi</td><td>Pendapatan, HPP, Komisi, OPEX, Laba Bersih Real per periode/cabang</td><td>Owner Only</td></tr>
+<tr><td>🔧 Laporan Servisan</td><td>Semua unit masuk, filter status/cabang/tanggal, klik ke detail</td><td>Owner + Admin</td></tr>
+<tr><td>🏠 Ringkasan Tutup Toko</td><td>Uang Part per Supplier, Ongkos per Teknisi, Saldo Kasir — untuk pembagian uang laci</td><td>Owner + Admin</td></tr>
+<tr><td>📋 Riwayat Part</td><td>Semua pergerakan stok, filter supplier/merk/tanggal, Export CSV</td><td>Owner + Admin</td></tr>
+</table>
+
+<h2>🗂️ E. MASTER DATA</h2>
+<table>
+<tr><th>Tab</th><th>Yang Bisa Dikelola</th></tr>
+<tr><td>🏢 Cabang</td><td>CRUD cabang (nama, alamat, telepon). Bisa tambah cabang "GUDANG"</td></tr>
+<tr><td>👥 Karyawan</td><td>CRUD karyawan (nama, peran, cabang, komisi %, telepon)</td></tr>
+<tr><td>🔧 Part/Stok</td><td>CRUD barang + field Persamaan baru + Import CSV Persamaan massal</td></tr>
+<tr><td>📋 Dropdown</td><td>Kelola isi dropdown: Jenis Barang, Merk, Kategori, Supplier, dll</td></tr>
+<tr><td>⚙️ Config</td><td>Konfigurasi logo cabang, nama toko, dll</td></tr>
+<tr><td>👤 Users</td><td>Kelola akun login (username, password, role, cabang) — khusus Owner</td></tr>
+</table>
+
+<h2>🔐 F. KEAMANAN & HAK AKSES</h2>
+<table>
+<tr><th>Role</th><th>Hak Akses</th></tr>
+<tr><td><b>OWNER</b></td><td>Semua fitur + Laba Rugi + Laporan Lengkap + Void + Semua Cabang + Users</td></tr>
+<tr><td><b>ADMIN</b></td><td>Semua operasional + Edit/Hapus Transaksi. Tidak bisa lihat Laba Rugi</td></tr>
+<tr><td><b>Admin (Hanya Input)</b></td><td>Input transaksi/penjualan/pembelian/transfer SAJA. Tidak ada tombol Edit/Hapus, tidak ada Dashboard/Laba Rugi</td></tr>
+<tr><td><b>TEKNISI</b></td><td>Input transaksi & update status saja</td></tr>
+</table>
+
+<h2>🌐 G. FITUR TEKNIS & UI</h2>
+<table>
+<tr><th>Fitur</th><th>Detail</th></tr>
+<tr><td>Multi-Cabang</td><td>Kasir terkunci pada cabangnya. Owner lihat SEMUA</td></tr>
+<tr><td>Watermark & Logo Dinamis</td><td>Logo berubah sesuai cabang login + efek glowing/drop-shadow per warna cabang</td></tr>
+<tr><td>Scroll Horizontal Tabel</td><td>Scrollbar bawah untuk tabel lebar agar semua kolom bisa dilihat</td></tr>
+<tr><td>Export CSV</td><td>Tersedia di semua laporan utama</td></tr>
+<tr><td>Concurrency Lock</td><td>LockService mencegah data ganda jika 2 user simpan bersamaan</td></tr>
+<tr><td>Activity Log</td><td>Semua aksi user tercatat di ACTIVITY_LOG untuk audit</td></tr>
+<tr><td>Autocomplete Cerdas</td><td>Cari barang by nama ATAU by persamaan/alias tipe HP</td></tr>
+<tr><td>Dark Theme Premium</td><td>UI Glassmorphism, gradient, micro-animation</td></tr>
+</table>
+
+<div style="text-align:center;margin-top:40px;padding:20px;border-top:2px dashed #ccc;color:#5c6bc0;font-weight:bold">
+ServicePro HP v5.1 — Sistem Kasir Multi-Cabang Kelas Enterprise<br>
+<span style="font-weight:normal;font-size:13px;color:#9e9e9e">Dikembangkan bersama Antigravity AI</span>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,590 @@
+<script>
+/* ============================================================
+   ServicePro HP v5.1 — Common JavaScript Utilities
+   Session management, API wrapper, notifications, modals
+   ============================================================ */
+
+// ======================== SESSION MANAGEMENT ========================
+const Session = {
+  KEY: 'servicepro_session',
+
+  save(data) {
+    localStorage.setItem(this.KEY, JSON.stringify(data));
+  },
+
+  get() {
+    try { return JSON.parse(localStorage.getItem(this.KEY)); } catch(e) { return null; }
+  },
+
+  clear() {
+    localStorage.removeItem(this.KEY);
+  },
+
+  isLoggedIn() {
+    const s = this.get();
+    return s && s.username && s.role;
+  },
+
+  getCabang() {
+    const s = this.get();
+    return s ? s.cabang : '';
+  },
+
+  getRole() {
+    const s = this.get();
+    return s ? s.role : '';
+  },
+
+  getUsername() {
+    const s = this.get();
+    return s ? s.username : '';
+  },
+
+  getNama() {
+    const s = this.get();
+    return s ? s.nama : '';
+  },
+
+  isCabangLocked() {
+    const s = this.get();
+    return s && s.cabang && s.cabang !== 'SEMUA';
+  },
+
+  hasPermission(feature) {
+    const s = this.get();
+    if (!s || !s.permissions) return false;
+    return s.permissions.indexOf(feature) !== -1;
+  },
+
+  getActiveViewCabang() {
+    if (this.isCabangLocked()) return this.getCabang();
+    return localStorage.getItem(this.KEY + '_viewcab') || this.getCabang() || 'SEMUA';
+  },
+
+  setActiveViewCabang(cab) {
+    localStorage.setItem(this.KEY + '_viewcab', cab);
+  }
+};
+
+// ======================== API WRAPPER ========================
+const API = {
+  call(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
+  }
+};
+
+// ======================== TOAST NOTIFICATIONS ========================
+const Toast = {
+  container: null,
+
+  init() {
+    if (!this.container) {
+      this.container = document.createElement('div');
+      this.container.className = 'toast-container';
+      document.body.appendChild(this.container);
+    }
+  },
+
+  show(message, type = 'info', duration = 4000) {
+    this.init();
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    const icons = {success:'✅', error:'❌', warning:'⚠️', info:'ℹ️'};
+    toast.innerHTML = (icons[type]||'') + ' ' + message;
+    this.container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, duration);
+  },
+
+  success(msg) { this.show(msg, 'success'); },
+  error(msg) { this.show(msg, 'error', 6000); },
+  warning(msg) { this.show(msg, 'warning'); },
+  info(msg) { this.show(msg, 'info'); }
+};
+
+// ======================== MODAL SYSTEM ========================
+const Modal = {
+  show(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('show');
+  },
+  hide(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+  },
+  confirm(title, message) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay show';
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:400px">
+          <div class="modal-header"><h3 class="modal-title">${title}</h3></div>
+          <div class="modal-body"><p style="color:var(--text-secondary)">${message}</p></div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" id="_modal_cancel">Batal</button>
+            <button class="btn btn-danger" id="_modal_confirm">Ya, Lanjutkan</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#_modal_cancel').onclick = () => { overlay.remove(); resolve(false); };
+      overlay.querySelector('#_modal_confirm').onclick = () => { overlay.remove(); resolve(true); };
+    });
+  }
+};
+
+// ======================== LOADING ========================
+const Loading = {
+  el: null,
+  show(text = 'Memproses...') {
+    if (this.el) this.hide();
+    this.el = document.createElement('div');
+    this.el.className = 'loading-overlay';
+    this.el.innerHTML = `<div class="spinner"></div><div class="loading-text">${text}</div>`;
+    document.body.appendChild(this.el);
+  },
+  hide() {
+    if (this.el) { this.el.remove(); this.el = null; }
+  }
+};
+
+// ======================== FORMAT HELPERS ========================
+function formatRupiah(n) {
+  if (!n && n !== 0) return 'Rp 0';
+  return 'Rp ' + Number(n).toLocaleString('id-ID');
+}
+
+function formatNumber(n) {
+  return Number(n || 0).toLocaleString('id-ID');
+}
+
+function formatDate(d) {
+  if (!d) return '-';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('id-ID', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' ' +
+         dt.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+}
+
+function formatDateShort(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+}
+
+// Format input angka otomatis dengan Rupiah saat diketik (untuk elemen dengan ID)
+function setupRupiahInput(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.addEventListener('input', function(e) {
+    formatRupiahInputEvent(this);
+  });
+}
+
+// Format input angka otomatis (untuk event handler inline oninput="...")
+function formatRupiahInputEvent(el) {
+  let cursorPosition = el.selectionStart;
+  let val = el.value.replace(/[^,\d]/g, ''); // bersihkan non-digit
+  if (val === '') { el.value = ''; return; }
+  
+  // Simpan panjang sebelum diformat
+  let oldLength = el.value.length;
+  
+  // Format dengan titik
+  let formatted = Number(val).toLocaleString('id-ID');
+  el.value = formatted;
+  
+  // Sesuaikan posisi kursor
+  let newLength = el.value.length;
+  cursorPosition = cursorPosition + (newLength - oldLength);
+  el.setSelectionRange(cursorPosition, cursorPosition);
+}
+
+// Mendapatkan nilai angka murni dari input Rupiah (ID)
+function getRupiahValue(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el || !el.value) return 0;
+  return unformatRupiah(el.value);
+}
+
+// Helper unformat dari string apapun
+function unformatRupiah(str) {
+  if (!str) return 0;
+  return Number(String(str).replace(/\./g, '').replace(/,/g, '')) || 0;
+}
+
+// Export Tabel HTML ke CSV
+function exportToCSV(tableId, filename) {
+  const table = document.getElementById(tableId);
+  if (!table) return Toast.error('Tabel tidak ditemukan: ' + tableId);
+
+  const rows = table.querySelectorAll('tr');
+  if (!rows.length) return Toast.error('Tidak ada data untuk diekspor');
+
+  const csvRows = [];
+
+  rows.forEach(function(row) {
+    const cells = row.querySelectorAll('th, td');
+    const rowData = [];
+
+    cells.forEach(function(cell) {
+      // Ambil teks bersih: hilangkan HTML tag, newline, dan spasi berlebih
+      let text = cell.innerText || cell.textContent || '';
+
+      // Bersihkan: hapus newline di dalam cell, ratakan spasi
+      text = text.replace(/(\r\n|\n|\r)/g, ' ').replace(/\s+/g, ' ').trim();
+
+      // Bersihkan emoji dan karakter unicode yang membingungkan Excel
+      // (opsional — aktifkan jika ingin CSV bersih tanpa emoji)
+      // text = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').trim();
+
+      // Hilangkan teks dari spinner / loading yang mungkin masih ada
+      if (text === 'Memuat...' || text === 'Loading') text = '';
+
+      // Escape: kutip ganda di dalam teks jadi dua kutip (standar CSV)
+      text = text.replace(/"/g, '""');
+
+      // Bungkus dengan tanda kutip (wajib jika ada koma atau newline)
+      rowData.push('"' + text + '"');
+    });
+
+    // Hanya tambahkan baris yang tidak kosong semua
+    if (rowData.some(function(c) { return c !== '""'; })) {
+      csvRows.push(rowData.join(','));
+    }
+  });
+
+  if (!csvRows.length) return Toast.error('Tidak ada data untuk diekspor');
+
+  // BOM UTF-8 agar Excel membaca karakter Indonesia/aksara dengan benar
+  const BOM = '\uFEFF';
+  const csvContent = BOM + csvRows.join('\n');
+
+  // Buat dan klik link download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = (filename || 'Export_ServicePro') + '_' + getTodayStr() + '.csv';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  Toast.success('Export berhasil: ' + link.download);
+}
+
+function getStatusBadge(status) {
+  const cls = 'badge badge-' + (status||'').toLowerCase().replace(/ /g,'_');
+  const labels = {
+    'ANTRI':'⏳ Antri', 'PROSES':'🔧 Proses', 'SEDANG_PROSES':'🔧 Sedang Proses',
+    'SELESAI_BELUM_DIAMBIL':'✅ Selesai', 'SELESAI_BELUM_LUNAS':'💳 Belum Lunas',
+    'SELESAI_DIAMBIL':'✅ Diambil', 'BATAL':'❌ Batal',
+    'AKTIF':'Aktif', 'NONAKTIF':'Nonaktif', 'LUNAS':'Lunas', 'BELUM_LUNAS':'Belum Lunas'
+  };
+  return `<span class="${cls}">${labels[status]||status||'-'}</span>`;
+}
+
+function getBranchColor(cab) {
+  const colors = {SIB:'var(--color-sib)', BL:'var(--color-bl)', LJ:'var(--color-lj)', AF:'var(--color-af)', SEMUA:'var(--color-utama)'};
+  return colors[cab] || 'var(--accent-blue)';
+}
+
+function getBranchClass(cab) {
+  return (cab||'utama').toLowerCase();
+}
+
+// ======================== NAVIGATION ========================
+function navigateTo(page) {
+  const cab = Session.getCabang();
+  const url = '?p=' + page + (cab && cab !== 'SEMUA' ? '&cab=' + cab : '');
+  google.script.history.push(null, {p:page}, url);
+  loadPage(page);
+}
+
+function goToStatus(id) {
+  navigateTo('status');
+  // Tunggu DOM halaman Status siap sebelum memuat detail
+  var attempts = 0;
+  var checker = setInterval(function() {
+    attempts++;
+    var el = document.getElementById('statusSearch');
+    if (el) {
+      clearInterval(checker);
+      el.value = id;
+      if (typeof loadTrxDetail === 'function') loadTrxDetail(id);
+    }
+    if (attempts > 30) clearInterval(checker); // timeout setelah 3 detik
+  }, 100);
+}
+
+function logout() {
+  Session.clear();
+  window.location.reload();
+}
+
+// ======================== SIDEBAR & BRANDING ========================
+function updateBranchStyle(cab) {
+  document.body.setAttribute('data-branch', cab || 'SEMUA');
+  const topName = document.getElementById('topBranchName');
+  const logo = document.getElementById('branchLogoContainer');
+  const watermarkSemua = document.getElementById('watermarkSemua');
+
+  // Default Emojis
+  const defaultEmojis = {
+    'SIB': '📱', 'BL': '⚡', 'LJ': '🛠️', 'AF': '🔧', 'SEMUA': '🌐'
+  };
+
+  // Handle SEMUA watermark (4 logo quadrants)
+  if (watermarkSemua) {
+    if (!cab || cab === 'SEMUA') {
+      watermarkSemua.style.display = 'grid';
+      // Make sure body::after is hidden when SEMUA
+      document.documentElement.style.setProperty('--branch-logo-url', 'none');
+    } else {
+      watermarkSemua.style.display = 'none';
+    }
+  }
+
+  if (logo) {
+    const logos = window.BRANCH_LOGOS || {};
+    const logoUrl = logos[cab];
+    if (logoUrl && logoUrl.indexOf('http') === 0) {
+      logo.innerHTML = `<img src="${logoUrl}" class="dynamic-branch-logo">`;
+      if (cab !== 'SEMUA') {
+        document.documentElement.style.setProperty('--branch-logo-url', `url(${logoUrl})`);
+      } else {
+        document.documentElement.style.setProperty('--branch-logo-url', 'none');
+      }
+    } else {
+      logo.textContent = defaultEmojis[cab] || '🔧';
+      document.documentElement.style.setProperty('--branch-logo-url', 'none');
+    }
+  }
+}
+
+
+function refreshCurrentPage() {
+  const activeNav = document.querySelector('.nav-item.active');
+  if (!activeNav) return;
+  
+  const page = activeNav.dataset.page;
+  const refreshFunctions = {
+    'dashboard': 'refreshDashboard',
+    'laporankas': 'refreshLaporanKas',
+    'laporanstok': 'refreshLaporanStok',
+    'riwayatpart': 'refreshRiwayat',
+    'laporanlengkap': 'refreshLaporanLengkap',
+    'kasir': 'refreshKasir'
+  };
+  
+  const fnName = refreshFunctions[page];
+  if (fnName && typeof window[fnName] === 'function') {
+    window[fnName]();
+    Toast.info('Data telah diperbarui');
+  } else {
+    // For forms or pages without specific refresh, reload the page
+    loadPage(page);
+    Toast.info('Halaman dimuat ulang');
+  }
+}
+
+async function initSidebar() {
+  const session = Session.get();
+  if (!session) return;
+  
+  // Fetch dynamic logos if not already fetched
+  if (!window.BRANCH_LOGOS) {
+    try {
+      // Timeout 3 detik agar tidak menunggu logo terlalu lama
+      window.BRANCH_LOGOS = await Promise.race([
+        API.call('getBranchLogos'),
+        new Promise(function(resolve) { setTimeout(function() { resolve({}); }, 3000); })
+      ]);
+    } catch(e) { window.BRANCH_LOGOS = {}; }
+  }
+
+  updateBranchStyle(session.cabang);
+
+  // Set user info
+  const userAvatar = document.getElementById('sidebarUserAvatar');
+  const userName = document.getElementById('sidebarUserName');
+  const userRole = document.getElementById('sidebarUserRole');
+  if (userAvatar) userAvatar.textContent = (session.nama||'U')[0].toUpperCase();
+  if (userName) userName.textContent = session.nama || session.username;
+  if (userRole) userRole.textContent = session.role + (session.cabang!=='SEMUA' ? ' — '+session.cabang : ' — Semua Cabang');
+
+  // Set branch badge
+  const badge = document.querySelector('.branch-badge');
+  if (badge) {
+    badge.className = 'branch-badge ' + getBranchClass(session.cabang);
+    badge.textContent = session.cabang === 'SEMUA' ? '🌐 UTAMA' : '📍 ' + session.cabang;
+  }
+
+  // Show/hide nav items based on permissions
+  document.querySelectorAll('.nav-item[data-feature]').forEach(item => {
+    const feature = item.dataset.feature;
+    if (!Session.hasPermission(feature)) {
+      item.style.display = 'none';
+    }
+  });
+
+  // Hamburger toggle
+  const hamburger = document.querySelector('.hamburger');
+  const sidebar = document.querySelector('.sidebar');
+  if (hamburger && sidebar) {
+    hamburger.onclick = () => sidebar.classList.toggle('open');
+    // Close sidebar on nav item click (mobile)
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => { if (window.innerWidth <= 768) sidebar.classList.remove('open'); });
+    });
+  }
+}
+
+// ======================== AUTOCOMPLETE HELPER (FIXED PORTAL) ========================
+// Menggunakan satu div portal yang ditempel langsung ke <body> agar
+// keluar dari semua stacking context (backdrop-filter, transform, dll).
+(function() {
+  // Buat satu portal global jika belum ada
+  function getPortal() {
+    let p = document.getElementById('__acPortal');
+    if (!p) {
+      p = document.createElement('div');
+      p.id = '__acPortal';
+      p.style.cssText = 'position:fixed;z-index:99999;top:0;left:0;width:0;height:0;pointer-events:none;';
+      document.body.appendChild(p);
+    }
+    return p;
+  }
+
+  window.setupAutocomplete = function(inputId, listId, fetchFn, onSelect) {
+    const input = document.getElementById(inputId);
+    const origList = document.getElementById(listId);
+    if (!input || !origList) return;
+
+    // Buat list baru di portal agar lepas dari stacking context
+    const list = document.createElement('div');
+    list.className = 'autocomplete-list ac-portal-list';
+    list.id = listId + '_portal';
+    list.style.cssText = 'pointer-events:auto;display:none;position:fixed;z-index:99999;';
+    getPortal().appendChild(list);
+
+    function positionList() {
+      const rect = input.getBoundingClientRect();
+      list.style.left = rect.left + 'px';
+      list.style.top = (rect.bottom + 2) + 'px';
+      list.style.width = Math.max(rect.width, 340) + 'px';
+      list.style.maxHeight = '300px';
+      list.style.overflowY = 'auto';
+    }
+
+    function hideList() {
+      list.style.display = 'none';
+    }
+
+    let timer;
+    const doSearch = () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const q = input.value.trim();
+        try {
+          const results = await fetchFn(q);
+          if (!results || results.length === 0) { hideList(); return; }
+          list.innerHTML = results.map((r, i) => {
+            const display = typeof r === 'string' ? r : (r.nama ? r.nama + (r.telepon ? ` <span style="font-size:11px;color:#94a3b8">(${r.telepon})</span>` : '') : r.label || '');
+            return `<div class="autocomplete-item" data-index="${i}">${display}</div>`;
+          }).join('');
+          positionList();
+          list.style.display = 'block';
+          list.querySelectorAll('.autocomplete-item').forEach((el, i) => {
+            el.onmousedown = (e) => {
+              e.preventDefault();
+              onSelect(results[i]);
+              hideList();
+            };
+          });
+        } catch(e) { hideList(); }
+      }, 250);
+    };
+
+    input.addEventListener('input', doSearch);
+    input.addEventListener('focus', doSearch);
+    input.addEventListener('blur', () => setTimeout(hideList, 200));
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !list.contains(e.target)) hideList();
+    });
+  };
+})();
+
+// ======================== TABLE PAGINATION ========================
+function paginateData(data, page, perPage) {
+  perPage = perPage || 20;
+  const total = data.length;
+  const totalPages = Math.ceil(total / perPage);
+  const start = (page - 1) * perPage;
+  const items = data.slice(start, start + perPage);
+  return { items, page, perPage, total, totalPages };
+}
+
+function renderPagination(containerId, currentPage, totalPages, onPageChange) {
+  const c = document.getElementById(containerId);
+  if (!c || totalPages <= 1) { if(c) c.innerHTML=''; return; }
+  let html = '<div style="display:flex;gap:6px;justify-content:center;margin-top:16px;">';
+  if (currentPage > 1) html += `<button class="btn btn-sm btn-outline" onclick="(${onPageChange.name||'changePage'})(${currentPage-1})">←</button>`;
+  for (let i = Math.max(1,currentPage-2); i <= Math.min(totalPages,currentPage+2); i++) {
+    html += `<button class="btn btn-sm ${i===currentPage?'btn-primary':'btn-outline'}" onclick="(${onPageChange.name||'changePage'})(${i})">${i}</button>`;
+  }
+  if (currentPage < totalPages) html += `<button class="btn btn-sm btn-outline" onclick="(${onPageChange.name||'changePage'})(${currentPage+1})">→</button>`;
+  html += '</div>';
+  c.innerHTML = html;
+}
+
+// ======================== DATE HELPERS ========================
+function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+function getMonthStartStr() { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0]; }
+
+// ======================== BRANDING & UI ANIMATIONS ========================
+function animateCounter(id, targetValue, duration = 1000) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isRupiah = el.textContent.includes('Rp');
+  const numericTarget = unformatRupiah(targetValue);
+  
+  if (numericTarget === 0) {
+    el.textContent = targetValue;
+    return;
+  }
+  
+  const startTimestamp = performance.now();
+  
+  const step = (currentTimestamp) => {
+    const progress = Math.min((currentTimestamp - startTimestamp) / duration, 1);
+    // easeOutExpo
+    const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+    const currentValue = Math.floor(easeOut * numericTarget);
+    
+    el.textContent = isRupiah ? formatRupiah(currentValue) : formatNumber(currentValue);
+    
+    if (progress < 1) {
+      window.requestAnimationFrame(step);
+    } else {
+      el.textContent = targetValue; // Ensure exact final value
+    }
+  };
+  window.requestAnimationFrame(step);
+}
+
+function staggerTableRows(tableBodyId) {
+  const tbody = document.getElementById(tableBodyId);
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach((row, i) => {
+    row.classList.add('stagger-row');
+    row.style.animationDelay = (i * 0.05) + 's';
+  });
+}
+
+</script>

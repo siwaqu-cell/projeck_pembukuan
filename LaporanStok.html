@@ -1,0 +1,201 @@
+<!-- LaporanStok.html — Stock Report -->
+<script>
+let stokLaporanData = [];
+let stokLaporanLoaded = false;
+
+async function loadLaporanStok() {
+  const content = document.getElementById('pageContent');
+  const cabLocked = Session.isCabangLocked();
+
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">📦 Laporan Stok</h1><p class="page-subtitle">Stok & pergerakan part per cabang</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="navigateTo('masterdata')">⚙️ Edit/Tambah Barang</button>
+        <button class="btn btn-outline" onclick="exportToCSV('stokLaporanTable','Laporan_Stok')">📥 Export CSV</button>
+        <button class="btn btn-outline" onclick="refreshLaporanStok()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      ${!cabLocked ? `<div class="form-group"><label class="form-label">Cabang</label>
+        <select class="form-control" id="stokFilterCab" onchange="refreshLaporanStok()">
+          <option value="">Semua</option>
+        </select></div>` : ''}
+      <div class="form-group"><label class="form-label">Dari</label>
+        <input type="date" class="form-control" id="stokFilterStart" value="${getMonthStartStr()}"></div>
+      <div class="form-group"><label class="form-label">Sampai</label>
+        <input type="date" class="form-control" id="stokFilterEnd" value="${getTodayStr()}"></div>
+      <div class="form-group" style="flex:1"><label class="form-label">Cari Part</label>
+        <input type="text" class="form-control" id="stokFilterSearch" placeholder="🔍 Ketik nama barang..." oninput="filterStokTable()"></div>
+      <div class="form-group" style="align-self:flex-end">
+        <button class="btn btn-primary" onclick="refreshLaporanStok()">🔍 Tampilkan</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card"><div class="kpi-label">Total Qty Stok</div><div class="kpi-value" id="stokTotalItem">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Nilai Stok (Modal)</div><div class="kpi-value" id="stokTotalNilai">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Masuk (Periode)</div><div class="kpi-value" id="stokMasuk" style="color:var(--accent-emerald)">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Keluar (Periode)</div><div class="kpi-value" id="stokKeluar" style="color:var(--accent-red)">-</div></div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="card-header">
+        <h3 class="card-title">📦 Daftar Stok Barang</h3>
+        <span id="stokCount" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+      <div id="stokTableWrapper">
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">
+          <div class="spinner" style="width:40px;height:40px;border-width:3px;display:inline-block;margin-bottom:12px"></div>
+          <p>Memuat data stok...</p>
+        </div>
+      </div>
+    </div>`;
+
+  // Load cabang dropdown
+  if (!cabLocked) {
+    try {
+      const cl = await API.call('getCabangList');
+      const sel = document.getElementById('stokFilterCab');
+      if (sel && cl) {
+        cl.forEach(c => {
+          const o = document.createElement('option');
+          o.value = c.id;
+          o.textContent = c.id + (c.nama ? ' - ' + c.nama : '');
+          sel.appendChild(o);
+        });
+        const saved = Session.getActiveViewCabang();
+        if (saved && saved !== 'SEMUA') sel.value = saved;
+      }
+    } catch(e) { console.warn('Gagal load cabang list:', e.message); }
+  }
+
+  refreshLaporanStok();
+}
+
+async function refreshLaporanStok() {
+  const cabSel = document.getElementById('stokFilterCab');
+  const wrapper = document.getElementById('stokTableWrapper');
+  
+  let cab = '';
+  if (Session.isCabangLocked()) {
+    cab = Session.getCabang();
+  } else if (cabSel) {
+    cab = cabSel.value || '';
+    if (cab && cab !== 'SEMUA') Session.setActiveViewCabang(cab);
+  }
+
+  if (typeof updateBranchStyle === 'function') updateBranchStyle(cab || 'SEMUA');
+
+  // Show loading
+  if (wrapper) {
+    wrapper.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="width:30px;height:30px;border-width:3px;display:inline-block"></div><p style="margin-top:12px;color:var(--text-muted)">Mengambil data stok...</p></div>';
+  }
+
+  try {
+    const startDate = document.getElementById('stokFilterStart')?.value || '';
+    const endDate   = document.getElementById('stokFilterEnd')?.value || '';
+
+    const result = await API.call('getLaporanStok', cab === 'SEMUA' ? '' : cab, {
+      startDate: startDate,
+      endDate: endDate
+    });
+
+    if (!result) throw new Error('Backend mengembalikan data kosong (null)');
+
+    stokLaporanData = result.stokList || [];
+    const summary   = result.summary || {};
+
+    // Update KPI
+    const elItem  = document.getElementById('stokTotalItem');
+    const elNilai = document.getElementById('stokTotalNilai');
+    const elMasuk = document.getElementById('stokMasuk');
+    const elKeluar= document.getElementById('stokKeluar');
+    const elCount = document.getElementById('stokCount');
+
+    if (elItem)  elItem.textContent  = (summary.totalItem || 0).toLocaleString('id-ID');
+    if (elNilai) elNilai.textContent = formatRupiah(summary.totalNilai || 0);
+    if (elMasuk) elMasuk.textContent = (summary.masuk || 0).toLocaleString('id-ID');
+    if (elKeluar)elKeluar.textContent= (summary.keluar || 0).toLocaleString('id-ID');
+    if (elCount) elCount.textContent = stokLaporanData.length + ' jenis barang';
+
+    renderStokTable();
+
+  } catch(err) {
+    console.error('[LaporanStok] refreshLaporanStok error:', err);
+    if (wrapper) {
+      wrapper.innerHTML = `<div style="text-align:center;padding:40px">
+        <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+        <p style="color:var(--accent-red);font-weight:600">Gagal memuat data stok</p>
+        <p style="color:var(--text-muted);font-size:13px;margin-top:8px">${err.message}</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="refreshLaporanStok()">🔄 Coba Lagi</button>
+      </div>`;
+    }
+    Toast.error('Gagal memuat stok: ' + err.message);
+  }
+}
+
+function renderStokTable() {
+  const wrapper = document.getElementById('stokTableWrapper');
+  if (!wrapper) return;
+
+  if (!stokLaporanData || stokLaporanData.length === 0) {
+    wrapper.innerHTML = `<div style="text-align:center;padding:50px">
+      <div style="font-size:50px;margin-bottom:12px">📦</div>
+      <p style="color:var(--text-muted)">Tidak ada data stok untuk filter ini.</p>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="navigateTo('masterdata')">+ Tambah Barang Baru</button>
+    </div>`;
+    return;
+  }
+
+  let html = `<div class="table-container">
+    <table class="data-table" id="stokLaporanTable">
+      <thead><tr>
+        <th>Nama Barang</th><th>Merk</th><th>Kategori</th><th>Supplier</th><th>Cabang</th>
+        <th class="text-center">Stok</th>
+        <th class="text-right">H.Beli</th>
+        <th class="text-right">H.Jual</th>
+        <th class="text-right">Nilai</th>
+      </tr></thead>
+      <tbody>`;
+
+  stokLaporanData.forEach(function(s) {
+    const nama  = s.NAMA_PART || s.nama || '-';
+    const merk  = s.MERK_BARANG || s.merkBarang || '-';
+    const kat   = s.SUB_KATEGORI || s.subKategori || '-';
+    const sup   = s.SUPPLIER || s.supplier || '-';
+    const cab   = s.CABANG || s.cabang || '-';
+    const stk   = Number(s.STOK !== undefined ? s.STOK : s.stok) || 0;
+    const hb    = Number(s.HARGA_BELI !== undefined ? s.HARGA_BELI : s.hargaBeli) || 0;
+    const hj    = Number(s.HARGA_JUAL !== undefined ? s.HARGA_JUAL : s.hargaJual) || 0;
+
+    const stkColor = stk <= 0 ? 'var(--accent-red)' : stk <= 3 ? 'var(--accent-amber)' : 'inherit';
+    const stkLabel = stk <= 0 ? '🔴 HABIS' : stk;
+
+    html += `<tr>
+      <td style="font-weight:500">${nama}</td>
+      <td>${merk}</td>
+      <td>${kat}</td>
+      <td>${sup}</td>
+      <td>${cab}</td>
+      <td class="text-center" style="font-weight:700;color:${stkColor}">${stkLabel}</td>
+      <td class="text-right">${formatRupiah(hb)}</td>
+      <td class="text-right">${formatRupiah(hj)}</td>
+      <td class="text-right" style="font-weight:600">${formatRupiah(stk * hb)}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  wrapper.innerHTML = html;
+}
+
+function filterStokTable() {
+  const q = (document.getElementById('stokFilterSearch')?.value || '').toUpperCase();
+  const rows = document.querySelectorAll('#stokLaporanTable tbody tr');
+  rows.forEach(function(r) {
+    r.style.display = r.textContent.toUpperCase().indexOf(q) !== -1 ? '' : 'none';
+  });
+}
+</script>

@@ -1,0 +1,722 @@
+<!-- StatusForm.html — Update Status, Edit Part & Pelunasan BON -->
+<script>
+let currentTrxDetail = null;
+let allStatusTrx = [];
+
+async function loadStatus() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">🔄 Update Status Servisan</h1>
+      <p class="page-subtitle">Update status, edit part, ubah pembayaran, pelunasan BON</p></div>
+      <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">🔍 Cari & Filter Transaksi</h3>
+      </div>
+      <div class="form-row">
+        ${!Session.isCabangLocked() ? `
+        <div class="form-group">
+          <label class="form-label">Cabang</label>
+          <select class="form-control" id="statusCabang" onchange="refreshStatusList()">
+            <option value="SEMUA">Semua Cabang</option>
+          </select>
+        </div>` : ''}
+        <div class="form-group">
+          <label class="form-label">Filter Status</label>
+          <select class="form-control" id="statusFilter" onchange="refreshStatusList()">
+            <option value="AKTIF">Semua Aktif (Antri/Proses/Belum Diambil)</option>
+            <option value="SEMUA">Semua (Termasuk Selesai & Batal)</option>
+            <option value="ANTRI">Antri</option>
+            <option value="PROSES">Proses</option>
+            <option value="SEDANG_PROSES">Sedang Proses</option>
+            <option value="SELESAI_BELUM_DIAMBIL">Selesai Belum Diambil</option>
+            <option value="SELESAI_BELUM_LUNAS">Selesai Belum Lunas</option>
+            <option value="BON">Transaksi BON (Belum Lunas)</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Cari</label>
+          <input type="text" id="statusSearch" class="form-control" placeholder="ID / Nama / HP..." onkeyup="if(event.key==='Enter')refreshStatusList()">
+        </div>
+        <div class="form-group" style="align-self:flex-end">
+          <button class="btn btn-primary" onclick="refreshStatusList()">🔍 Cari</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="statusDetailPanel" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📋 Detail Transaksi</h3>
+          <span id="statusTrxId" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
+        <div id="statusDetailContent"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom:16px">⚡ Update Status & Pembayaran</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Status Baru</label>
+            <select class="form-control" id="statusNew"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Teknisi</label>
+            <select class="form-control" id="statusTeknisi"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Metode Bayar</label>
+            <select class="form-control" id="statusMetode">
+              <option value="">— Tidak berubah —</option>
+              <option value="CASH">Cash</option><option value="TRANSFER">Transfer</option><option value="BON">BON</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Catatan</label>
+          <textarea class="form-control" id="statusCatatan" placeholder="Catatan update..."></textarea>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:16px">
+          <button class="btn btn-primary" onclick="submitStatusUpdate()">💾 Update Status</button>
+          ${(Session.getRole()==='OWNER'||Session.getRole()==='ADMIN')?'<button class="btn btn-warning" onclick="showEditPartPanel()">🔧 Edit Part</button>':''}
+          ${(Session.getRole()==='OWNER'||Session.getRole()==='ADMIN')?'<button class="btn btn-info" onclick="showEditHeaderPanel()" style="background:var(--accent-cyan);color:#000;border:none">✏️ Edit Transaksi</button>':''}
+          <button id="btnLunasiBon" class="btn btn-success" style="display:none" onclick="lunasiBon()">💰 Lunasi BON</button>
+          <button class="btn btn-outline" id="btnCetakNota" onclick="printNota(currentTrxDetail.transaksi.ID_TRANSAKSI)">🖨️ Cetak Nota</button>
+          ${(Session.getRole()==='OWNER'||Session.getRole()==='ADMIN')?'<button class="btn btn-outline" style="color:var(--accent-red);border-color:var(--accent-red)" onclick="konfirmasiVoidTrx()">🗑️ Hapus/Void</button>':''}
+        </div>
+      </div>
+
+      <div id="editPartPanel" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🔧 Edit Part & Biaya</h3>
+            <button class="btn btn-sm btn-primary" onclick="addStatusPartRow()">+ Tambah Part</button>
+          </div>
+          <div class="table-container" style="overflow:visible">
+            <table class="part-table"><thead><tr>
+              <th style="width:90px">Jenis</th><th style="width:90px">Kategori</th><th style="width:90px">Merk</th>
+              <th style="min-width:200px">Nama Part</th><th style="width:90px">Supplier</th>
+              <th style="width:60px">Qty</th><th style="width:100px">H.Beli</th><th style="width:100px">H.Jual</th><th style="width:40px"></th>
+            </tr></thead><tbody id="statusPartBody"></tbody></table>
+          </div>
+          <div class="form-group" style="margin-top:12px">
+            <label class="form-label">Ongkos Kerja</label>
+            <input type="number" id="statusOngkos" class="form-control" value="0" min="0">
+          </div>
+          <button class="btn btn-success" style="margin-top:12px" onclick="submitEditPart()">💾 Simpan Perubahan Part</button>
+        </div>
+      </div>
+
+      <div id="editHeaderPanel" style="display:none">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">✏️ Edit Data Pelanggan & HP</h3></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Nama Pelanggan</label><input type="text" id="ehNama" class="form-control"></div>
+            <div class="form-group"><label class="form-label">No. WA / Telepon</label><input type="text" id="ehWA" class="form-control"></div>
+            <div class="form-group"><label class="form-label">Tipe HP</label><input type="text" id="ehHP" class="form-control"></div>
+            <div class="form-group"><label class="form-label">Kerusakan</label><input type="text" id="ehKerusakan" class="form-control"></div>
+          </div>
+          <button class="btn btn-success" style="margin-top:12px" onclick="submitEditHeader()">💾 Simpan Data Transaksi</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="card-header">
+        <h3 class="card-title">📋 Daftar Transaksi</h3>
+        <span id="statusListCount" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+      <div id="activeTransList"></div>
+    </div>
+  `;
+
+  // Populate cabang dropdown
+  if (!Session.isCabangLocked()) {
+    try {
+      const cabList = await API.call('getCabangList');
+      const sel = document.getElementById('statusCabang');
+      if (sel) {
+        cabList.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.id} - ${c.nama}</option>`; });
+        sel.value = Session.getActiveViewCabang();
+      }
+    } catch(e) {}
+  }
+
+  // Populate status dropdown
+  const statSel = document.getElementById('statusNew');
+  ['ANTRI','PROSES','SEDANG_PROSES','SELESAI_BELUM_DIAMBIL','SELESAI_BELUM_LUNAS','SELESAI_DIAMBIL','BATAL'].forEach(s => {
+    statSel.innerHTML += `<option value="${s}">${s.replace(/_/g,' ')}</option>`;
+  });
+
+  // Load all transactions
+  refreshStatusList();
+}
+
+async function refreshStatusList() {
+  const el = document.getElementById('activeTransList');
+  const countEl = document.getElementById('statusListCount');
+  el.innerHTML = '<div class="empty-state"><p>Memuat data...</p></div>';
+
+  const cab = Session.isCabangLocked() ? Session.getCabang() : (document.getElementById('statusCabang')?.value || 'SEMUA');
+  const filter = document.getElementById('statusFilter')?.value || 'AKTIF';
+  const search = document.getElementById('statusSearch')?.value?.trim().toUpperCase() || '';
+
+  try {
+    // Ambil data servis
+    const cabParam = cab==='SEMUA' ? '' : cab;
+    console.log('[STATUS] Fetching trx for cabang:', cabParam || 'SEMUA');
+    let trxData = await API.call('getTransaksiList', cabParam, {status:'SEMUA'});
+    console.log('[STATUS] Got', (trxData||[]).length, 'transactions');
+
+    let list = (trxData||[]).map(t => ({
+      id: t.ID_TRANSAKSI,
+      tipe: 'SERVIS',
+      pelanggan: t.NAMA_PELANGGAN,
+      hp: t.TIPE_HP || '-',
+      kerusakan: t.KERUSAKAN || '-',
+      status: t.STATUS,
+      metode: String(t.METODE_BAYAR || '-').trim(),
+      total: (Number(t.HARGA_JUAL)||0) + (Number(t.ONGKOS_KERJA)||0),
+      cabang: t.CABANG,
+      tanggal: t.TGL_MASUK
+    }));
+
+    // Filter by status
+    if (filter === 'AKTIF') {
+      // Tampilkan: semua yang belum BATAL, kecuali SELESAI_DIAMBIL yang BUKAN BON
+      list = list.filter(t => t.status !== 'BATAL' && !(t.status === 'SELESAI_DIAMBIL' && t.metode !== 'BON'));
+    } else if (filter === 'BON') {
+      list = list.filter(t => t.metode === 'BON' && t.status !== 'BATAL');
+    } else if (filter !== 'SEMUA') {
+      list = list.filter(t => t.status === filter);
+    }
+
+    // Filter by search
+    if (search) {
+      list = list.filter(t =>
+        t.id.toUpperCase().indexOf(search) !== -1 ||
+        t.pelanggan.toUpperCase().indexOf(search) !== -1 ||
+        t.hp.toUpperCase().indexOf(search) !== -1
+      );
+    }
+
+    allStatusTrx = list;
+    if (countEl) countEl.textContent = list.length + ' transaksi';
+
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><p>Tidak ada transaksi ditemukan</p></div>';
+      return;
+    }
+
+    let html = '<div class="table-container"><table class="data-table"><thead><tr><th>ID</th><th>Pelanggan</th><th>HP/Ket</th><th>Status</th><th>Bayar</th><th class="text-right">Total</th><th>Aksi</th></tr></thead><tbody>';
+    list.forEach(t => {
+      const bonStyle = t.metode==='BON' ? 'color:var(--accent-amber);font-weight:700' : '';
+      html += `<tr style="cursor:pointer" onclick="loadTrxDetail('${t.id}')">
+        <td style="font-size:11px;color:var(--primary)">${t.id}</td>
+        <td>${t.pelanggan}</td>
+        <td style="font-size:12px">${t.hp}</td>
+        <td>${getStatusBadge(t.status)}</td>
+        <td style="${bonStyle}">${t.metode}</td>
+        <td class="text-right">${formatRupiah(t.total)}</td>
+        <td>
+          ${t.metode==='BON' ? `<button class="btn btn-sm btn-success" onclick="event.stopPropagation();quickLunasi('${t.id}','CASH')" title="Lunasi Cash">💵</button>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();quickLunasi('${t.id}','TRANSFER')" title="Lunasi Transfer" style="margin-left:2px">🏦</button>` :
+          `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();loadTrxDetail('${t.id}')">Pilih</button>`}
+        </td>
+      </tr>`;
+    });
+    el.innerHTML = html + '</tbody></table></div>';
+
+  } catch(e) { el.innerHTML = '<div class="empty-state"><p>Gagal memuat data: '+e.message+'</p></div>'; }
+}
+
+async function quickLunasi(id, metode) {
+  const konfirm = await Modal.confirm('Lunasi BON?', `Apakah pelanggan sudah membayar transaksi ${id} via ${metode}?`);
+  if (!konfirm) return;
+  Loading.show('Memproses pelunasan...');
+  try {
+    const result = await API.call('lunasiBon', id, metode, Session.getUsername());
+    if (result.success) {
+      Toast.success(result.message);
+      refreshStatusList();
+    } else Toast.error(result.message);
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+async function loadTrxDetail(id) {
+  Loading.show('Memuat detail...');
+  try {
+    currentTrxDetail = await API.call('getTransaksiDetail', id);
+    if (!currentTrxDetail) { Toast.error('Transaksi tidak ditemukan'); Loading.hide(); return; }
+    const t = currentTrxDetail.transaksi;
+    document.getElementById('statusTrxId').textContent = id;
+    document.getElementById('statusNew').value = t.STATUS;
+
+    // Show/hide BON lunasi button
+    const btnLunasi = document.getElementById('btnLunasiBon');
+    if (btnLunasi) {
+      btnLunasi.style.display = (t.METODE_BAYAR === 'BON') ? 'inline-flex' : 'none';
+    }
+
+    const dc = document.getElementById('statusDetailContent');
+    dc.innerHTML = `
+      <div class="form-row" style="font-size:13px">
+        <div><strong>Pelanggan:</strong> ${t.NAMA_PELANGGAN} (${t.TELEPON||'-'})</div>
+        <div><strong>HP:</strong> ${t.TIPE_HP}</div>
+        <div><strong>Kerusakan:</strong> ${t.KERUSAKAN}</div>
+        <div><strong>Cabang:</strong> ${t.CABANG}</div>
+        <div><strong>Penerima:</strong> ${t.PENERIMA}</div>
+        <div><strong>Teknisi:</strong> ${t.TEKNISI||'-'}</div>
+        <div><strong>Status:</strong> ${getStatusBadge(t.STATUS)}</div>
+        <div><strong>Metode:</strong> <span style="font-weight:700;color:${t.METODE_BAYAR==='BON'?'var(--accent-amber)':'inherit'}">${t.METODE_BAYAR||'-'}</span></div>
+        <div><strong>Total:</strong> ${formatRupiah((Number(t.HARGA_JUAL)||0)+(Number(t.ONGKOS_KERJA)||0))}</div>
+        ${Session.getRole()==='OWNER' ? `<div><strong>Laba:</strong> ${formatRupiah(t.LABA_BERSIH)}</div>` : ''}
+      </div>
+      ${currentTrxDetail.parts.length > 0 ? `
+      <h4 style="margin-top:16px;font-size:14px">🔧 Part yang digunakan:</h4>
+      <table class="data-table" style="margin-top:8px"><thead><tr><th>Part</th><th>Merk</th><th>Qty</th><th>H.Jual</th></tr></thead><tbody>
+      ${currentTrxDetail.parts.map(p => `<tr><td>${p.NAMA_PART}</td><td>${p.MERK_PART||p.MERK_BARANG||'-'}</td><td>${p.QTY}</td><td>${formatRupiah(p.HARGA_JUAL)}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+    `;
+
+    // Load teknisi options
+    const cab = t.CABANG;
+    const teknisiList = await API.call('getTeknisiByCabang', cab);
+    const tekSel = document.getElementById('statusTeknisi');
+    tekSel.innerHTML = '<option value="">— Tidak berubah —</option>' +
+      (teknisiList||[]).map(k => `<option value="${k.nama}" ${k.nama===t.TEKNISI?'selected':''}>${k.nama}</option>`).join('');
+
+    document.getElementById('statusDetailPanel').style.display = 'block';
+    document.getElementById('editPartPanel').style.display = 'none';
+    document.getElementById('editHeaderPanel').style.display = 'none';
+    document.getElementById('statusOngkos').value = t.ONGKOS_KERJA||0;
+
+    // Scroll ke detail panel
+    document.getElementById('statusDetailPanel').scrollIntoView({behavior:'smooth', block:'start'});
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+async function submitStatusUpdate() {
+  if (!currentTrxDetail) return;
+  const id = currentTrxDetail.transaksi.ID_TRANSAKSI;
+  const newStatus = document.getElementById('statusNew').value;
+  Loading.show('Mengupdate status...');
+  try {
+    const result = await API.call('updateStatus', id, newStatus, {
+      teknisi: document.getElementById('statusTeknisi').value || undefined,
+      metodeBayar: document.getElementById('statusMetode').value || undefined,
+      catatan: document.getElementById('statusCatatan').value,
+      createdBy: Session.getUsername()
+    });
+    if (result.success) { Toast.success(result.message); loadTrxDetail(id); refreshStatusList(); }
+    else Toast.error(result.message);
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+async function lunasiBon() {
+  if (!currentTrxDetail) return;
+  const id = currentTrxDetail.transaksi.ID_TRANSAKSI;
+  const metode = document.getElementById('statusMetode').value;
+  if (!metode || metode === 'BON') {
+    Toast.warning('Pilih metode pembayaran (Cash / Transfer) di dropdown "Metode Bayar" terlebih dahulu');
+    return;
+  }
+  const konfirm = await Modal.confirm('Lunasi BON?', `Apakah pelanggan sudah membayar transaksi ${id} via ${metode}?`);
+  if (!konfirm) return;
+  Loading.show('Memproses pelunasan...');
+  try {
+    const result = await API.call('lunasiBon', id, metode, Session.getUsername());
+    if (result.success) {
+      Toast.success(result.message);
+      loadTrxDetail(id);
+      refreshStatusList();
+    } else Toast.error(result.message);
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+
+
+// ===== STOK DATA UNTUK EDIT PART =====
+let statusStokList = []; // cache stok cabang transaksi aktif
+let sPartCounter = 100;
+
+function getStatusStokCab() {
+  // Gunakan stok cabang dari transaksi yang sedang diedit
+  const cab = currentTrxDetail ? String(currentTrxDetail.transaksi.CABANG || '').trim() : '';
+  if (!cab || !statusStokList.length) return statusStokList;
+  return statusStokList.filter(s => s.cabang === cab && s.stok > 0);
+}
+
+async function showEditPartPanel() {
+  if (!currentTrxDetail) return;
+  const cab = String(currentTrxDetail.transaksi.CABANG || '').trim();
+
+  // Load stok cabang jika belum ada
+  if (!statusStokList.length || (statusStokList[0] && statusStokList[0].cabang !== cab)) {
+    Loading.show('Memuat data stok...');
+    try {
+      statusStokList = await API.call('getStokByCabang', cab);
+    } catch(e) { statusStokList = []; }
+    Loading.hide();
+  }
+
+  document.getElementById('editPartPanel').style.display = 'block';
+  document.getElementById('editHeaderPanel').style.display = 'none';
+  const tbody = document.getElementById('statusPartBody');
+  tbody.innerHTML = '';
+
+  // Render existing parts dengan autocomplete
+  currentTrxDetail.parts.forEach((p, i) => {
+    addStatusPartRowWithData({
+      nama: p.NAMA_PART || '',
+      merkBarang: p.MERK_PART || p.MERK_BARANG || '',
+      subKategori: p.KATEGORI || p.SUB_KATEGORI || '',
+      supplier: p.SUPPLIER || '',
+      jenisBarang: p.JENIS_BARANG || '',
+      qty: p.QTY || 1,
+      hargaBeli: p.HARGA_BELI || 0,
+      hargaJual: p.HARGA_JUAL || 0
+    });
+  });
+
+  document.getElementById('editPartPanel').scrollIntoView({behavior:'smooth'});
+}
+
+function addStatusPartRowWithData(data) {
+  data = data || {};
+  sPartCounter++;
+  const rid = sPartCounter;
+  const stok = getStatusStokCab();
+
+  const jenisAll = [...new Set(stok.map(s => s.jenisBarang).filter(v => v))];
+  const katAll   = [...new Set(stok.map(s => s.subKategori).filter(v => v))];
+  const merkAll  = [...new Set(stok.map(s => s.merkBarang).filter(v => v))];
+  const supAll   = [...new Set(stok.map(s => s.supplier).filter(v => v))];
+
+  const tr = document.createElement('tr');
+  tr.id = 'sPartRow_' + rid;
+  tr.innerHTML = `
+    <td>
+      <select class="part-jenis" style="width:100%;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;font-size:12px" onchange="onStatusFilter(${rid})">
+        <option value="">Semua</option>${jenisAll.map(j=>`<option value="${j}"${data.jenisBarang===j?' selected':''}>${j}</option>`).join('')}
+      </select>
+    </td>
+    <td>
+      <select class="part-kategori" style="width:100%;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;font-size:12px" onchange="onStatusFilter(${rid})">
+        <option value="">Semua</option>${katAll.map(k=>`<option value="${k}"${data.subKategori===k?' selected':''}>${k}</option>`).join('')}
+      </select>
+    </td>
+    <td>
+      <select class="part-merk" style="width:100%;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;font-size:12px" onchange="onStatusFilter(${rid})">
+        <option value="">Semua</option>${merkAll.map(m=>`<option value="${m}"${data.merkBarang===m?' selected':''}>${m}</option>`).join('')}
+      </select>
+    </td>
+    <td>
+      <div class="autocomplete-wrapper" style="position:relative">
+        <input type="text" class="part-nama" value="${data.nama||''}" placeholder="🔍 Ketik/pilih nama part..." style="width:100%;padding:6px 8px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;font-size:13px"
+          onfocus="showStatusNama(${rid})" oninput="showStatusNama(${rid})">
+        <div class="autocomplete-list" id="sAC_${rid}"></div>
+      </div>
+    </td>
+    <td>
+      <select class="part-supplier" style="width:100%;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;font-size:12px">
+        <option value="">—</option>${supAll.map(s=>`<option value="${s}"${data.supplier===s?' selected':''}>${s}</option>`).join('')}
+      </select>
+    </td>
+    <td><input type="number" class="part-qty" value="${data.qty||1}" min="1" style="width:60px;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;text-align:center"></td>
+    <td><input type="number" class="part-hbeli" value="${data.hargaBeli||0}" style="width:90px;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px"></td>
+    <td><input type="number" class="part-hjual" value="${data.hargaJual||0}" style="width:90px;padding:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px"></td>
+    <td><button class="btn-remove-row" onclick="this.closest('tr').remove()">✕</button></td>
+  `;
+  document.getElementById('statusPartBody').appendChild(tr);
+}
+
+function addStatusPartRow() {
+  // Pastikan stok sudah dimuat
+  if (!statusStokList.length && currentTrxDetail) {
+    const cab = String(currentTrxDetail.transaksi.CABANG || '').trim();
+    Loading.show('Memuat stok...');
+    API.call('getStokByCabang', cab).then(data => {
+      statusStokList = data || [];
+      Loading.hide();
+      addStatusPartRowWithData({});
+    }).catch(() => { Loading.hide(); addStatusPartRowWithData({}); });
+  } else {
+    addStatusPartRowWithData({});
+  }
+}
+
+function onStatusFilter(rid) {
+  const row = document.getElementById('sPartRow_' + rid);
+  if (!row) return;
+  const jVal = row.querySelector('.part-jenis').value;
+  const kVal = row.querySelector('.part-kategori').value;
+  const mVal = row.querySelector('.part-merk').value;
+
+  const stok = getStatusStokCab().filter(s =>
+    (!jVal || s.jenisBarang === jVal) &&
+    (!kVal || s.subKategori === kVal) &&
+    (!mVal || s.merkBarang === mVal)
+  );
+
+  const katFiltered = [...new Set(stok.map(s => s.subKategori).filter(v => v))];
+  const kSel = row.querySelector('.part-kategori');
+  const kCur = kSel.value;
+  kSel.innerHTML = '<option value="">Semua</option>' + katFiltered.map(k => `<option value="${k}"${k===kCur?' selected':''}>${k}</option>`).join('');
+
+  const merkFiltered = [...new Set(stok.map(s => s.merkBarang).filter(v => v))];
+  const mSel = row.querySelector('.part-merk');
+  const mCur = mSel.value;
+  mSel.innerHTML = '<option value="">Semua</option>' + merkFiltered.map(m => `<option value="${m}"${m===mCur?' selected':''}>${m}</option>`).join('');
+
+  const supFiltered = [...new Set(stok.map(s => s.supplier).filter(v => v))];
+  const sSel = row.querySelector('.part-supplier');
+  const sCur = sSel.value;
+  sSel.innerHTML = '<option value="">—</option>' + supFiltered.map(s => `<option value="${s}"${s===sCur?' selected':''}>${s}</option>`).join('');
+
+  if (stok.length === 1) autoFillStatusPart(row, stok[0]);
+}
+
+function showStatusNama(rid) {
+  const row = document.getElementById('sPartRow_' + rid);
+  if (!row) return;
+  const input  = row.querySelector('.part-nama');
+  const acList = document.getElementById('sAC_' + rid);
+  const q    = input.value.trim().toUpperCase();
+  const jVal = row.querySelector('.part-jenis').value;
+  const kVal = row.querySelector('.part-kategori').value;
+  const mVal = row.querySelector('.part-merk').value;
+
+  const stok = getStatusStokCab().filter(s => {
+    const jenisOk = (!jVal || s.jenisBarang === jVal);
+    const katOk = (!kVal || s.subKategori === kVal);
+    const merkOk = (!mVal || s.merkBarang === mVal);
+    if (!jenisOk || !katOk || !merkOk) return false;
+    if (!q) return true;
+    if (s.nama.toUpperCase().indexOf(q) !== -1) return true;
+    if (s.persamaan && s.persamaan.toUpperCase().indexOf(q) !== -1) return true;
+    return false;
+  });
+
+  if (!stok.length) {
+    acList.innerHTML = '<div class="autocomplete-item" style="color:var(--text-muted)">Tidak ada barang di stok cabang ini</div>';
+    acList.classList.add('show');
+    return;
+  }
+
+  // Group by nama
+  const namaMap = {};
+  stok.forEach(s => {
+    if (!namaMap[s.nama]) namaMap[s.nama] = { nama: s.nama, items: [], totalStok: 0 };
+    namaMap[s.nama].items.push(s);
+    namaMap[s.nama].totalStok += s.stok;
+    // Deteksi alias
+    if (q && s.nama.toUpperCase().indexOf(q) === -1 && s.persamaan && s.persamaan.toUpperCase().indexOf(q) !== -1) {
+      const matchedAlias = s.persamaan.split(',').map(a=>a.trim()).find(a=>a.toUpperCase().indexOf(q)!==-1);
+      if (matchedAlias && !namaMap[s.nama].aliasMatch) namaMap[s.nama].aliasMatch = matchedAlias;
+    }
+  });
+  const results = Object.values(namaMap).slice(0, 20);
+
+  acList.innerHTML = results.map((r, i) => {
+    const info = r.items[0];
+    const extra = r.items.length > 1 ? `<span style="color:var(--accent-amber)">${r.items.length} varian</span> | ` : '';
+    const aliasLabel = r.aliasMatch
+      ? `<span style="color:var(--accent-amber);font-size:10px;background:rgba(245,158,11,0.15);padding:2px 6px;border-radius:10px;margin-left:4px">↩ via alias: ${r.aliasMatch}</span>`
+      : (info.persamaan ? `<span style="color:var(--accent-blue);font-size:10px"> | 🔁 ${info.persamaan}</span>` : '');
+    return `<div class="autocomplete-item" data-idx="${i}">
+      <strong>${r.nama}</strong>
+      <span style="font-size:11px;color:var(--text-muted);margin-left:6px">${extra}${info.jenisBarang||''} | ${info.subKategori||''} | ${info.merkBarang||''} | Stok: <span style="color:var(--accent-emerald)">${r.totalStok}</span>${aliasLabel}</span>
+    </div>`;
+  }).join('');
+  acList.classList.add('show');
+
+  acList.querySelectorAll('.autocomplete-item[data-idx]').forEach((el, i) => {
+    el.onclick = () => {
+      if (i >= results.length) return;
+      const r = results[i];
+      input.value = r.nama;
+      row.dataset.aliasDigunakan = r.aliasMatch || '';
+      acList.classList.remove('show');
+
+      if (r.items.length === 1) {
+        autoFillStatusPart(row, r.items[0]);
+      } else {
+        // Multiple variants → filter
+        const jList = [...new Set(r.items.map(s => s.jenisBarang).filter(v => v))];
+        const kList = [...new Set(r.items.map(s => s.subKategori).filter(v => v))];
+        const mList = [...new Set(r.items.map(s => s.merkBarang).filter(v => v))];
+        const sList = [...new Set(r.items.map(s => s.supplier).filter(v => v))];
+
+        const jSel = row.querySelector('.part-jenis');
+        jSel.innerHTML = '<option value="">— Pilih —</option>' + jList.map(j => `<option value="${j}">${j}</option>`).join('');
+        if (jList.length === 1) jSel.value = jList[0];
+
+        const kSel = row.querySelector('.part-kategori');
+        kSel.innerHTML = '<option value="">— Pilih —</option>' + kList.map(k => `<option value="${k}">${k}</option>`).join('');
+        if (kList.length === 1) kSel.value = kList[0];
+
+        const mSel = row.querySelector('.part-merk');
+        mSel.innerHTML = '<option value="">— Pilih —</option>' + mList.map(m => `<option value="${m}">${m}</option>`).join('');
+        if (mList.length === 1) mSel.value = mList[0];
+
+        const sSel = row.querySelector('.part-supplier');
+        sSel.innerHTML = '<option value="">—</option>' + sList.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (sList.length === 1) sSel.value = sList[0];
+
+        const finalMatch = r.items.filter(s =>
+          (!jSel.value || s.jenisBarang === jSel.value) &&
+          (!kSel.value || s.subKategori === kSel.value) &&
+          (!mSel.value || s.merkBarang === mSel.value) &&
+          (!sSel.value || s.supplier === sSel.value)
+        );
+        if (finalMatch.length === 1) autoFillStatusPart(row, finalMatch[0]);
+      }
+    };
+  });
+}
+
+function autoFillStatusPart(row, s) {
+  row.querySelector('.part-jenis').innerHTML    = `<option value="${s.jenisBarang||''}">${s.jenisBarang||'-'}</option>`;
+  row.querySelector('.part-kategori').innerHTML = `<option value="${s.subKategori||''}">${s.subKategori||'-'}</option>`;
+  row.querySelector('.part-merk').innerHTML     = `<option value="${s.merkBarang||''}">${s.merkBarang||'-'}</option>`;
+  row.querySelector('.part-supplier').innerHTML = `<option value="${s.supplier||''}">${s.supplier||'-'}</option>`;
+  row.querySelector('.part-nama').value         = s.nama;
+  row.querySelector('.part-hbeli').value        = s.hargaBeli || 0;
+  row.querySelector('.part-hjual').value        = s.hargaJual || 0;
+}
+
+// Tutup autocomplete jika klik di luar
+document.addEventListener('click', e => {
+  if (!e.target.closest('.autocomplete-wrapper')) {
+    document.querySelectorAll('#statusPartBody .autocomplete-list').forEach(l => l.classList.remove('show'));
+  }
+});
+
+async function submitEditPart() {
+  if (!currentTrxDetail) return;
+  const id = currentTrxDetail.transaksi.ID_TRANSAKSI;
+  const rows = document.querySelectorAll('#statusPartBody tr');
+  const parts = [];
+  rows.forEach(r => {
+    const nama = r.querySelector('.part-nama')?.value?.trim();
+    if (!nama) return;
+    parts.push({
+      nama,
+      jenisBarang: r.querySelector('.part-jenis')?.value || '',
+      merkBarang:  r.querySelector('.part-merk')?.value || '',
+      subKategori: r.querySelector('.part-kategori')?.value || '',
+      supplier:    r.querySelector('.part-supplier')?.value || '',
+      qty:         Number(r.querySelector('.part-qty')?.value) || 1,
+      hargaBeli:   Number(r.querySelector('.part-hbeli')?.value) || 0,
+      hargaJual:   Number(r.querySelector('.part-hjual')?.value) || 0,
+      aliasDigunakan: r.dataset.aliasDigunakan || ''
+    });
+  });
+  Loading.show('Menyimpan perubahan...');
+  try {
+    const result = await API.call('editPart', id, {
+      parts,
+      ongkosKerja: Number(document.getElementById('statusOngkos').value) || 0,
+      status:      document.getElementById('statusNew').value,
+      teknisi:     document.getElementById('statusTeknisi').value,
+      createdBy:   Session.getUsername()
+    });
+    if (result.success) {
+      Toast.success(result.message);
+      statusStokList = []; // reset cache supaya reload stok segar
+      loadTrxDetail(id);
+    } else {
+      Toast.error(result.message);
+    }
+  } catch(e) { Toast.error('Error: ' + e.message); }
+  Loading.hide();
+}
+
+function showEditHeaderPanel() {
+  if (!currentTrxDetail) return;
+  const t = currentTrxDetail.transaksi;
+  document.getElementById('ehNama').value = t.NAMA_PELANGGAN || '';
+  document.getElementById('ehWA').value = t.TELEPON || '';
+  document.getElementById('ehHP').value = t.TIPE_HP || '';
+  document.getElementById('ehKerusakan').value = t.KERUSAKAN || '';
+  
+  document.getElementById('editHeaderPanel').style.display = 'block';
+  document.getElementById('editPartPanel').style.display = 'none';
+  document.getElementById('editHeaderPanel').scrollIntoView({behavior:'smooth'});
+}
+
+async function submitEditHeader() {
+  if (!currentTrxDetail) return;
+  const id = currentTrxDetail.transaksi.ID_TRANSAKSI;
+  const data = {
+    NAMA_PELANGGAN: document.getElementById('ehNama').value.trim(),
+    TELEPON: document.getElementById('ehWA').value.trim(),
+    TIPE_HP: document.getElementById('ehHP').value.trim(),
+    KERUSAKAN: document.getElementById('ehKerusakan').value.trim(),
+    createdBy: Session.getUsername()
+  };
+  
+  if (!data.NAMA_PELANGGAN || !data.TIPE_HP) {
+    Toast.warning('Nama pelanggan dan tipe HP tidak boleh kosong');
+    return;
+  }
+  
+  Loading.show('Menyimpan data transaksi...');
+  try {
+    const result = await API.call('updateTransaksiHeader', id, data);
+    if (result.success) {
+      Toast.success(result.message);
+      document.getElementById('editHeaderPanel').style.display = 'none';
+      loadTrxDetail(id);
+      refreshStatusList();
+    } else {
+      Toast.error(result.message);
+    }
+  } catch(e) { Toast.error('Error: ' + e.message); }
+  Loading.hide();
+}
+
+async function konfirmasiVoidTrx() {
+  if (!currentTrxDetail) return;
+  const t = currentTrxDetail.transaksi;
+  const id = t.ID_TRANSAKSI;
+  
+  // Tampilkan dialog konfirmasi kustom
+  const confirmed = confirm(
+    '⚠️ HAPUS / VOID TRANSAKSI\n\n' +
+    'ID: ' + id + '\n' +
+    'Pelanggan: ' + (t.NAMA_PELANGGAN||'-') + '\n' +
+    'HP: ' + (t.TIPE_HP||'-') + '\n' +
+    'Status: ' + (t.STATUS||'-') + '\n\n' +
+    'Stok part akan dikembalikan. Kas akan di-reverse.\n' +
+    'Tindakan ini TIDAK BISA dibatalkan!\n\n' +
+    'Lanjutkan VOID transaksi ini?'
+  );
+  if (!confirmed) return;
+  
+  Loading.show('Memproses void transaksi...');
+  try {
+    const result = await API.call('batalTransaksi', id, 'Void oleh: ' + Session.getUsername());
+    if (result.success) {
+      Toast.success('Transaksi ' + id + ' berhasil di-VOID');
+      currentTrxDetail = null;
+      document.getElementById('trxDetailPanel').style.display = 'none';
+      document.getElementById('editPartPanel').style.display = 'none';
+      document.getElementById('editHeaderPanel').style.display = 'none';
+      refreshStatusList();
+    } else {
+      Toast.error(result.message);
+    }
+  } catch(e) { Toast.error('Error void: ' + e.message); }
+  Loading.hide();
+}
+</script>

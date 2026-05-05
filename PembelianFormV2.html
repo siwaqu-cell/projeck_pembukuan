@@ -1,0 +1,338 @@
+<!-- PembelianForm.html — Bi-directional Cascade Dropdowns -->
+<script>
+let pembelianFormData = null;
+
+async function loadPembelian(customCab){
+  const cab = customCab || Session.getCabang();
+  Loading.show('Memuat...');
+  try{
+    pembelianFormData=await API.call('getPembelianFormData',cab==='SEMUA'?'':cab);
+    if (!customCab) {
+      renderPembelianUI();
+    }
+  }catch(e){}
+  Loading.hide();
+}
+
+function renderPembelianUI() {
+  const supOpts=(pembelianFormData?.supplierList||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+  const content=document.getElementById('pageContent');
+  content.innerHTML=`
+    <div class="page-header"><div><h1 class="page-title">📦 Pembelian Barang (v2)</h1><p class="page-subtitle">Input pembelian dari supplier</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-warning" onclick="showHutangModal()">💰 Bayar Hutang</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+    <div class="card" style="border-top: 4px solid var(--accent-blue)">
+      <h3 class="card-title" style="margin-bottom:16px">📋 Info Pembelian</h3>
+      <div class="form-row" style="margin-bottom:16px; background: rgba(99,102,241,0.05); padding:15px; border-radius:8px;">
+        <div class="form-group" style="max-width:300px">
+          <label class="form-label" style="color:var(--accent-blue); font-weight:700">📅 TANGGAL PEMBELIAN (WAJIB ISI)</label>
+          <input type="date" id="beliTgl" class="form-control" style="border: 2px solid var(--accent-blue)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label required">Supplier</label>
+          <select class="form-control" id="beliSup"><option value="">— Pilih —</option>${supOpts}<option value="__manual">+ Ketik manual</option></select></div>
+        ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label required">Cabang</label>
+          <select class="form-control" id="beliCab" onchange="onBeliCabChange()">${(pembelianFormData?.cabangList||[]).map(c=>`<option value="${c.id}">${c.id} - ${c.nama}</option>`).join('')}</select></div>`:''}
+        <div class="form-group"><label class="form-label required">Metode Bayar</label>
+          <select class="form-control" id="beliMetode"><option value="CASH">Cash</option><option value="TRANSFER">Transfer</option><option value="BON">BON (Hutang)</option></select></div>
+      </div></div>
+    <div class="card"><div class="card-header"><h3 class="card-title">🛒 Item Pembelian</h3>
+      <button class="btn btn-sm btn-primary" onclick="addBeliRow()">+ Tambah Item</button></div>
+      <div class="table-container" style="overflow:visible; min-height:300px;"><table class="part-table"><thead><tr>
+        <th style="width:100px">Jenis</th><th style="width:100px">Kategori</th><th style="width:90px">Merk</th>
+        <th style="min-width:130px; width:25%">Nama Barang</th><th style="min-width:100px; width:15%">Persamaan</th>
+        <th style="width:65px">Qty</th><th style="width:100px">H.Beli</th>
+        <th style="width:100px">H.Jual</th><th style="width:80px">Total</th><th style="width:35px"></th>
+      </tr></thead><tbody id="beliTB"></tbody></table></div>
+      <div class="calc-panel" style="margin-top:16px"><div class="calc-row total"><span class="calc-label">Grand Total</span><span class="calc-value" id="beliGT">Rp 0</span></div></div></div>
+    <div class="card"><div class="form-group"><label class="form-label">Catatan</label><textarea class="form-control" id="beliCat"></textarea></div>
+      <button class="btn btn-primary btn-lg" onclick="submitPembelian()">💾 Simpan Pembelian</button></div>`;
+  document.getElementById('beliSup').addEventListener('change',function(){if(this.value==='__manual'){var m=prompt('Nama supplier baru:');if(m){var o=document.createElement('option');o.value=m;o.text=m;this.insertBefore(o,this.lastElementChild);this.value=m;}else this.value='';}});
+  addBeliRow();
+}
+
+function getBC(){return Session.isCabangLocked()?Session.getCabang():(document.getElementById('beliCab')?.value||'');}
+function getBStok(){if(!pembelianFormData||!pembelianFormData.stokList)return[];return pembelianFormData.stokList;}
+async function onBeliCabChange(){
+  const c=document.getElementById('beliCab')?.value;
+  if(c){
+    Session.setActiveViewCabang(c);
+    if(typeof updateBranchStyle==='function') updateBranchStyle(c);
+    try {
+      pembelianFormData=await API.call('getPembelianFormData',c);
+      // Reset item rows with new data
+      document.getElementById('beliTB').innerHTML=''; bRC=0; addBeliRow();
+    } catch(e){}
+  }
+}
+
+function getKategoriByJenis(jenis) {
+  if (!pembelianFormData) return [];
+  if (jenis === 'SPAREPART') return pembelianFormData.kategoriSparepart || [];
+  if (jenis === 'TOOL') return pembelianFormData.kategoriTool || [];
+  if (jenis === 'ACCESSORIES') return pembelianFormData.kategoriAccessories || [];
+  return [...new Set([...(pembelianFormData.kategoriSparepart||[]),...(pembelianFormData.kategoriTool||[]),...(pembelianFormData.kategoriAccessories||[])])];
+}
+
+let bRC=0;
+function addBeliRow(){
+  bRC++;const rid=bRC,tbody=document.getElementById('beliTB'),tr=document.createElement('tr');tr.id='bR_'+rid;
+  const jAll=pembelianFormData?.jenisBarangList||[];
+  const kAll=getKategoriByJenis('');
+  const mAll=pembelianFormData?.merkBarangList||[];
+  tr.innerHTML=`
+    <td><select class="pJenis" onchange="onBFilter(${rid})"><option value="">— Pilih —</option>${jAll.map(j=>`<option value="${j}">${j}</option>`).join('')}</select></td>
+    <td><select class="pKat"><option value="">— Pilih —</option>${kAll.map(k=>`<option value="${k}">${k}</option>`).join('')}</select></td>
+    <td><select class="pMerk"><option value="">— Pilih —</option>${mAll.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></td>
+    <td><div class="autocomplete-wrapper"><input type="text" class="pNama" placeholder="🔍 Ketik/klik pilih..." onfocus="showBNama(${rid})" oninput="showBNama(${rid})">
+      <div class="autocomplete-list" id="bAC_${rid}"></div></div></td>
+    <td><input type="text" class="pPersamaan" placeholder="Alias..." style="font-size:12px;"></td>
+    <td><input type="number" class="pQty" value="1" min="1" oninput="recalcBeli()"></td>
+    <td><input type="text" class="pHB" value="0" oninput="formatRupiahInputEvent(this); recalcBeli()"></td>
+    <td><input type="text" class="pHJ" value="0" oninput="formatRupiahInputEvent(this)"></td>
+    <td style="font-weight:600" class="row-total">Rp 0</td>
+    <td><button class="btn-remove-row" onclick="document.getElementById('bR_${rid}').remove();recalcBeli()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function onBFilter(rid){
+  const row=document.getElementById('bR_'+rid);
+  const jV=row.querySelector('.pJenis').value;
+  const kF=getKategoriByJenis(jV);
+  const kSel=row.querySelector('.pKat'),kC=kSel.value;
+  kSel.innerHTML='<option value="">— Pilih —</option>'+kF.map(k=>`<option value="${k}"${k===kC?' selected':''}>${k}</option>`).join('');
+}
+
+function showBNama(rid){
+  const row=document.getElementById('bR_'+rid);
+  if(!row) return;
+  const input=row.querySelector('.pNama');
+  if(!input) return;
+  const q=input.value.trim().toUpperCase();
+  const jV=row.querySelector('.pJenis').value, kV=row.querySelector('.pKat').value, mV=row.querySelector('.pMerk').value;
+  
+  const stok=getBStok().filter(s=>
+    (!jV||s.jenisBarang===jV) && (!kV||s.subKategori===kV) && (!mV||s.merkBarang===mV) &&
+    (!q||s.nama.toUpperCase().indexOf(q)!==-1 || (s.persamaan&&s.persamaan.toUpperCase().indexOf(q)!==-1))
+  );
+
+  // Portal fix: div fixed ditempel ke body agar lepas dari backdrop-filter
+  const portalId = 'bAC_portal_'+rid;
+  let portal = document.getElementById(portalId);
+  if(!portal) {
+    portal = document.createElement('div');
+    portal.id = portalId;
+    portal.className = 'autocomplete-list';
+    portal.style.cssText = 'position:fixed;z-index:99999;pointer-events:auto;display:none;';
+    document.body.appendChild(portal);
+  }
+
+  function posPortal() {
+    const rect = input.getBoundingClientRect();
+    portal.style.left = rect.left + 'px';
+    portal.style.top = (rect.bottom + 2) + 'px';
+    portal.style.width = Math.max(rect.width, 320) + 'px';
+    portal.style.maxHeight = '280px';
+    portal.style.overflowY = 'auto';
+  }
+
+  if(!stok.length){
+    portal.innerHTML='<div class="autocomplete-item" style="color:#94a3b8">Part baru (input manual)</div>';
+    posPortal(); portal.style.display='block';
+    input.onblur = () => setTimeout(()=>{portal.style.display='none';}, 200);
+    return;
+  }
+
+  const nMap={};stok.forEach(s=>{if(!nMap[s.nama])nMap[s.nama]={nama:s.nama,items:[]};nMap[s.nama].items.push(s);});
+  const res=Object.values(nMap).slice(0,50);
+
+  portal.innerHTML=res.map((r,i)=>{const info=r.items[0];return `<div class="autocomplete-item" data-idx="${i}"><strong>${r.nama}</strong>
+    <span style="font-size:11px;color:#94a3b8;margin-left:6px">${info.jenisBarang||''} | ${info.subKategori||''} | ${info.merkBarang||''}</span></div>`;}).join('');
+
+  portal.querySelectorAll('.autocomplete-item[data-idx]').forEach((el,i)=>{
+    el.onmousedown=(e)=>{
+      e.preventDefault();
+      if(i>=res.length)return;
+      const r=res[i];input.value=r.nama;portal.style.display='none';
+      bAutoFill(row,r.items[0]);
+    };
+  });
+
+  posPortal(); portal.style.display='block';
+  input.onblur = () => setTimeout(()=>{portal.style.display='none';}, 200);
+}
+
+function bAutoFill(row,s){
+  if(s.jenisBarang) row.querySelector('.pJenis').value=s.jenisBarang;
+  onBFilter(row.id.split('_')[1]); // Update Kategori dropdown based on new Jenis
+  if(s.subKategori) row.querySelector('.pKat').value=s.subKategori;
+  if(s.merkBarang) row.querySelector('.pMerk').value=s.merkBarang;
+  row.querySelector('.pNama').value=s.nama;
+  if(row.querySelector('.pPersamaan')) row.querySelector('.pPersamaan').value=s.persamaan||'';
+  row.querySelector('.pHB').value=formatRupiah(s.hargaBeli||0).replace('Rp ','');
+  row.querySelector('.pHJ').value=formatRupiah(s.hargaJual||0).replace('Rp ','');
+  recalcBeli();
+}
+
+function recalcBeli(){let gt=0;document.querySelectorAll('#beliTB tr').forEach(r=>{const q=Number(r.querySelector('.pQty')?.value)||0,h=unformatRupiah(r.querySelector('.pHB')?.value)||0;const t=q*h;gt+=t;const td=r.querySelector('.row-total');if(td)td.textContent=formatRupiah(t);});document.getElementById('beliGT').textContent=formatRupiah(gt);}
+
+async function submitPembelian(){
+  const cab=getBC(),sup=document.getElementById('beliSup')?.value;if(!sup){Toast.warning('Pilih supplier');return;}
+  const items=[];document.querySelectorAll('#beliTB tr').forEach(r=>{const nama=r.querySelector('.pNama')?.value?.trim();if(!nama)return;
+    items.push({jenisBarang:r.querySelector('.pJenis')?.value||'',nama,subKategori:r.querySelector('.pKat')?.value||'',
+      merkBarang:r.querySelector('.pMerk')?.value||'',persamaan:r.querySelector('.pPersamaan')?.value||'',qty:Number(r.querySelector('.pQty')?.value)||1,
+      hargaBeli:unformatRupiah(r.querySelector('.pHB')?.value)||0,hargaJual:unformatRupiah(r.querySelector('.pHJ')?.value)||0});});
+  if(!items.length){Toast.warning('Tambahkan minimal 1 item');return;}
+  Loading.show('Menyimpan...');
+  try{
+    const tgl = document.getElementById('beliTgl')?.value || '';
+    const r=await API.call('savePembelian',{supplier:sup,cabang:cab,metodeBayar:document.getElementById('beliMetode').value,
+    tanggal:tgl, items,catatan:document.getElementById('beliCat')?.value||'',createdBy:Session.getUsername()});
+    if(r.success){Toast.success(r.message);loadPembelian();}else Toast.error(r.message);}catch(e){Toast.error('Error: '+e.message);}
+  Loading.hide();
+}
+
+// =================== HUTANG SUPPLIER MODAL ===================
+let hutangDataList = [];
+
+function showHutangModal() {
+  let m = document.getElementById('hutangModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'hutangModal';
+    m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);';
+    m.innerHTML = `
+      <div class="card" style="width:95%;max-width:900px;max-height:90vh;overflow-y:auto;position:relative;background:var(--bg-card);border:1px solid var(--border-glass);">
+        <button onclick="closeHutangModal()" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-muted);">&times;</button>
+        <h3 class="card-title" style="margin-bottom:20px;border-bottom:1px solid var(--border-glass);padding-bottom:10px;">💰 Daftar Hutang Supplier</h3>
+        <div style="display:flex;gap:10px;margin-bottom:15px">
+          ${!Session.isCabangLocked() ? '<select id="filterHutangCab" class="form-control" onchange="loadHutangList()"></select>' : ''}
+          <button class="btn btn-primary" onclick="loadHutangList()">🔄 Refresh</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr><th>Tanggal</th><th>Supplier</th><th>Keterangan</th><th class="text-right">Total Hutang</th><th class="text-right">Sisa Hutang</th><th class="text-center">Status</th><th class="text-center">Aksi</th></tr>
+            </thead>
+            <tbody id="hutangTableBody">
+              <tr><td colspan="7" class="text-center">Memuat...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(m);
+  }
+  m.style.display = 'flex';
+  
+  if(!Session.isCabangLocked()) {
+    const sel = document.getElementById('filterHutangCab');
+    if(sel && sel.options.length===0 && pembelianFormData?.cabangList) {
+      sel.innerHTML = '<option value="SEMUA">Semua Cabang</option>' + pembelianFormData.cabangList.map(c=>`<option value="${c.id}">${c.id} - ${c.nama}</option>`).join('');
+      sel.value = Session.getActiveViewCabang();
+    }
+  }
+  loadHutangList();
+}
+
+function closeHutangModal() {
+  const m = document.getElementById('hutangModal');
+  if(m) m.style.display = 'none';
+}
+
+async function loadHutangList() {
+  const tbody = document.getElementById('hutangTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner"></div> Memuat...</td></tr>';
+  let cab = Session.getCabang();
+  if(!Session.isCabangLocked()) cab = document.getElementById('filterHutangCab')?.value || 'SEMUA';
+  
+  try {
+    const data = await API.call('getHutangList', cab==='SEMUA'?'':cab);
+    hutangDataList = data || [];
+    renderHutangTable();
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderHutangTable() {
+  const tbody = document.getElementById('hutangTableBody');
+  
+  if (!hutangDataList || hutangDataList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-muted);font-size:15px;">Belum ada data hutang di cabang ini.<br><small>Hutang otomatis tercatat jika Anda melakukan Pembelian Barang dengan metode <b>BON</b>.</small></td></tr>';
+    return;
+  }
+
+  // Filter untuk hanya menampilkan yang SISA HUTANG > 0 dan BUKAN LUNAS
+  const filtered = hutangDataList.filter(h => {
+    let sisa = h.SISA_HUTANG;
+    if (typeof sisa === 'string') sisa = Number(sisa.replace(/[^0-9.-]+/g,"")) || 0;
+    else sisa = Number(sisa) || 0;
+    
+    let status = String(h.STATUS_BAYAR || '').toUpperCase().trim();
+    return status !== 'LUNAS' && sisa > 0;
+  });
+  
+  if(!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-muted);font-size:16px;">🎉 Semua hutang supplier di cabang ini sudah lunas!</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(h => {
+    let sisa = Number(String(h.SISA_HUTANG).replace(/[^0-9.-]+/g,"")) || 0;
+    let jumlah = Number(String(h.JUMLAH).replace(/[^0-9.-]+/g,"")) || 0;
+    return `
+    <tr>
+      <td>${formatDateShort(h.TANGGAL)}</td>
+      <td style="font-weight:600;color:var(--text-primary)">${h.SUPPLIER} <br><span style="font-size:10px;font-weight:normal;color:var(--text-muted)">${h.CABANG}</span></td>
+      <td style="font-size:12px;max-width:200px;white-space:normal;">${h.KETERANGAN||'-'}</td>
+      <td class="text-right" style="color:var(--text-muted)">${formatRupiah(jumlah)}</td>
+      <td class="text-right" style="color:var(--accent-red);font-weight:700;font-size:15px;">${formatRupiah(sisa)}</td>
+      <td class="text-center"><span class="badge" style="background:var(--accent-orange);color:#fff">BELUM LUNAS</span></td>
+      <td class="text-center"><button class="btn btn-sm btn-primary" onclick="promptBayarHutang('${h.ID_HUTANG}', ${sisa}, '${h.SUPPLIER}')" style="box-shadow:none;">💵 Bayar</button></td>
+    </tr>
+  `}).join('');
+}
+
+function promptBayarHutang(id, sisa, supplier) {
+  const amountStr = prompt(`Pembayaran Hutang ke Supplier: ${supplier}\nSisa Hutang saat ini: ${formatRupiah(sisa)}\n\nMasukkan nominal pembayaran yang ingin Anda lunasi (Rp):`, sisa);
+  if(!amountStr) return;
+  const amount = parseInt(amountStr.replace(/[^0-9]/g, ''), 10);
+  if(isNaN(amount) || amount <= 0) return Toast.warning('Nominal pembayaran tidak valid.');
+  if(amount > sisa) return Toast.warning('Nominal pembayaran tidak boleh melebihi sisa hutang.');
+  
+  const metode = prompt(`Metode Pembayaran:\nKetik angka 1 untuk CASH\nKetik angka 2 untuk TRANSFER\n`, '1');
+  if(metode !== '1' && metode !== '2') {
+    Toast.warning('Metode tidak valid. Pembayaran dibatalkan.');
+    return;
+  }
+  
+  if (confirm(`Konfirmasi Pembayaran:\nNominal: ${formatRupiah(amount)}\nMetode: ${metode==='1'?'CASH':'TRANSFER'}\nLanjutkan?`)) {
+    submitBayarHutang(id, amount, metode==='1'?'CASH':'TRANSFER');
+  }
+}
+
+async function submitBayarHutang(id, jumlah, metode) {
+  Loading.show('Memproses pembayaran...');
+  try {
+    const res = await API.call('bayarHutang', {
+      idHutang: id,
+      jumlah: jumlah,
+      metodeBayar: metode,
+      createdBy: Session.getUsername()
+    });
+    if(res.success) {
+      Toast.success(res.message);
+      loadHutangList(); // Refresh modal
+      // Refresh dashboard if it's visible, though we are in PembelianForm here
+    } else {
+      Toast.error(res.message);
+    }
+  } catch(e) { Toast.error(e.message); }
+  Loading.hide();
+}
+</script>

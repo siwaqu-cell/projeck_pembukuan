@@ -1,0 +1,128 @@
+<!-- RiwayatPart.html — Part Movement History -->
+<script>
+async function loadRiwayatPart() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">📋 Riwayat Part</h1><p class="page-subtitle">Tracking pergerakan part lengkap</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="refreshRiwayat()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label">Cabang</label>
+        <select class="form-control" id="rwCab" onchange="refreshRiwayat()"><option value="SEMUA">Semua</option></select></div>`:''}
+      <div class="form-group"><label class="form-label">Tipe</label>
+        <select class="form-control" id="rwTipe" onchange="refreshRiwayat()">
+          <option value="SEMUA">Semua</option><option value="MASUK">Masuk</option><option value="KELUAR">Keluar</option>
+          <option value="TRANSFER_MASUK">Transfer Masuk</option><option value="TRANSFER_KELUAR">Transfer Keluar</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Dari</label>
+        <input type="date" class="form-control" id="rwStart" value="${getMonthStartStr()}" onchange="refreshRiwayat()"></div>
+      <div class="form-group"><label class="form-label">Sampai</label>
+        <input type="date" class="form-control" id="rwEnd" value="${getTodayStr()}" onchange="refreshRiwayat()"></div>
+    </div>
+    <div class="filter-bar" style="margin-top:-10px">
+      <div class="form-group"><label class="form-label">Jenis</label>
+        <select class="form-control" id="rwJenis" onchange="refreshRiwayat()"><option value="SEMUA">Semua</option></select></div>
+      <div class="form-group"><label class="form-label">Kategori</label>
+        <select class="form-control" id="rwKategori" onchange="refreshRiwayat()"><option value="SEMUA">Semua</option></select></div>
+      <div class="form-group"><label class="form-label">Merk</label>
+        <select class="form-control" id="rwMerk" onchange="refreshRiwayat()"><option value="SEMUA">Semua</option></select></div>
+      <div class="form-group"><label class="form-label">Supplier</label>
+        <select class="form-control" id="rwSupplier" onchange="refreshRiwayat()"><option value="SEMUA">Semua</option></select></div>
+      <div class="form-group" style="flex:1"><label class="form-label">Cari Part</label>
+        <input type="text" class="form-control" id="rwSearch" placeholder="🔍 Nama part..." oninput="refreshRiwayat()"></div>
+      <div class="form-group" style="align-self:flex-end">
+        <button class="btn btn-outline" onclick="exportToCSV('rwTableContent', 'Laporan_Arus_Barang')">📥 Export CSV</button>
+      </div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px">
+      <div class="kpi-card"><div class="kpi-label">Total Barang Masuk</div><div class="kpi-value" id="rwTotalMasuk" style="color:var(--accent-emerald)">0</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Barang Keluar</div><div class="kpi-value" id="rwTotalKeluar" style="color:var(--accent-red)">0</div></div>
+    </div>
+    <div class="card"><div class="table-container" id="rwTable"></div><div id="rwPagination"></div></div>`;
+
+  if(!Session.isCabangLocked()){try{const cl=await API.call('getCabangList');const sel=document.getElementById('rwCab');
+    cl.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.id;sel.appendChild(o);});
+    if(sel) sel.value = Session.getActiveViewCabang();
+  }catch(e){}}
+  refreshRiwayat();
+}
+
+let rwData = [], rwPage = 1;
+
+async function refreshRiwayat() {
+  const cabSel = document.getElementById('rwCab');
+  if (cabSel && !Session.isCabangLocked()) {
+    Session.setActiveViewCabang(cabSel.value);
+  }
+  const cab = Session.getActiveViewCabang();
+  const filter = {
+    cabang:cab==='SEMUA'?'':cab, tipe:document.getElementById('rwTipe')?.value||'SEMUA',
+    startDate:document.getElementById('rwStart')?.value, endDate:document.getElementById('rwEnd')?.value,
+    namaPart:document.getElementById('rwSearch')?.value||'',
+    jenisBarang:document.getElementById('rwJenis')?.value||'SEMUA',
+    subKategori:document.getElementById('rwKategori')?.value||'SEMUA',
+    merkBarang:document.getElementById('rwMerk')?.value||'SEMUA',
+    supplier:document.getElementById('rwSupplier')?.value||'SEMUA'
+  };
+  try {
+    const res = await API.call('getRiwayatPart', filter);
+    rwData = res.riwayat || [];
+    document.getElementById('rwTotalMasuk').textContent = res.totals?.masuk || 0;
+    document.getElementById('rwTotalKeluar').textContent = res.totals?.keluar || 0;
+    rwPage = 1; renderRwTable();
+    populateRwFilters(); // Call to populate dropdowns based on current data
+  } catch(e) { Toast.error('Error: '+e.message); }
+}
+
+let filtersPopulated = false;
+function populateRwFilters() {
+  if (filtersPopulated) return;
+  if (!rwData || rwData.length === 0) return;
+  
+  const extractUnique = (key) => [...new Set(rwData.map(r => r[key]).filter(v => v))].sort();
+  
+  const jList = extractUnique('JENIS_BARANG');
+  const kList = extractUnique('SUB_KATEGORI');
+  const mList = extractUnique('MERK_BARANG');
+  const sList = extractUnique('SUPPLIER');
+  
+  const setOpts = (id, list) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = '<option value="SEMUA">Semua</option>' + list.map(i => `<option value="${i}">${i}</option>`).join('');
+    if (list.includes(cur)) el.value = cur;
+  };
+  
+  setOpts('rwJenis', jList);
+  setOpts('rwKategori', kList);
+  setOpts('rwMerk', mList);
+  setOpts('rwSupplier', sList);
+  
+  filtersPopulated = true;
+}
+
+function renderRwTable() {
+  const el = document.getElementById('rwTable');
+  if(!rwData||!rwData.length){el.innerHTML='<div class="empty-state"><p>Belum ada riwayat</p></div>';return;}
+  const paged = paginateData(rwData, rwPage, 25);
+  const tipeColors = {MASUK:'var(--accent-emerald)',KELUAR:'var(--accent-red)',TRANSFER_MASUK:'var(--accent-cyan)',TRANSFER_KELUAR:'var(--accent-amber)'};
+  let html = '<table class="data-table" id="rwTableContent"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Part</th><th>Merk</th><th>Supplier</th><th>Cabang</th><th class="text-center">Qty</th><th>Tipe</th><th>Referensi</th><th>Keterangan</th></tr></thead><tbody>';
+  paged.items.forEach(r => {
+    const color = tipeColors[r.TIPE]||'var(--text-secondary)';
+    var tipeStr = String(r.TIPE || '').replace(/_/g,' ');
+    html += `<tr><td>${formatDateShort(r.TANGGAL)}</td><td style="font-size:12px">${r.JENIS_TRANSAKSI||'-'}</td><td>${r.NAMA_PART}</td><td>${r.MERK_BARANG||'-'}</td><td style="font-size:12px">${r.SUPPLIER||'-'}</td><td>${r.CABANG}</td>
+    <td class="text-center" style="font-weight:600;color:${color}">${r.TIPE==='MASUK'||r.TIPE==='TRANSFER_MASUK'?'+':'−'}${r.QTY}</td>
+    <td><span style="color:${color};font-weight:500;font-size:12px">${tipeStr}</span></td>
+    <td style="font-size:11px">${r.ID_REFERENSI||'-'}</td><td style="font-size:12px;color:var(--text-muted)">${r.KETERANGAN||'-'}</td></tr>`;
+  });
+  el.innerHTML = html + '</tbody></table>';
+  renderPagination('rwPagination', rwPage, paged.totalPages, changeRwPage);
+}
+function changeRwPage(p) { rwPage = p; renderRwTable(); }
+</script>

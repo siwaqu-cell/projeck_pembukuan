@@ -1,0 +1,408 @@
+<!-- ServiceForm.html — Bi-directional Cascade: Filter dulu ATAU langsung pilih nama -->
+<script>
+let trxFormData = null;
+
+async function loadTransaksi() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">➕ Transaksi Service Baru</h1><p class="page-subtitle">Input data service HP baru</p></div>
+      <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+    </div>
+    <div class="card" style="position: relative; z-index: 55;">
+      <h3 class="card-title" style="margin-bottom:16px">⚡ Metode Service</h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <label class="mode-toggle-btn active" id="modeDitinggal" onclick="setServiceMode('DITINGGAL')" style="flex:1;min-width:200px;cursor:pointer;padding:16px 20px;border-radius:12px;border:2px solid var(--accent-blue);background:rgba(59,130,246,0.15);text-align:center;transition:all 0.3s">
+          <div style="font-size:28px;margin-bottom:6px">📥</div>
+          <strong style="font-size:15px">Ditinggal (Antri/Menginap)</strong>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">HP disimpan, dikerjakan nanti. Pelanggan pulang dulu.</div>
+        </label>
+        <label class="mode-toggle-btn" id="modeDitunggu" onclick="setServiceMode('DITUNGGU')" style="flex:1;min-width:200px;cursor:pointer;padding:16px 20px;border-radius:12px;border:2px solid var(--border-glass);background:transparent;text-align:center;transition:all 0.3s">
+          <div style="font-size:28px;margin-bottom:6px">⚡</div>
+          <strong style="font-size:15px">Ditunggu (Langsung Selesai)</strong>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">HP dikerjakan di tempat. Langsung bayar & ambil.</div>
+        </label>
+      </div>
+    </div>
+    <div class="card" style="position: relative; z-index: 50; overflow: visible;">
+      <h3 class="card-title" style="margin-bottom:20px">👤 Data Pelanggan</h3>
+      <div class="form-row">
+        <div class="form-group autocomplete-wrapper"><label class="form-label required">Nama Pelanggan</label>
+          <input type="text" id="trxNama" class="form-control" placeholder="Ketik nama...">
+          <div class="autocomplete-list" id="trxNamaList"></div></div>
+        <div class="form-group"><label class="form-label">Telepon</label><input type="text" id="trxTelepon" class="form-control" placeholder="08..."></div>
+        <div class="form-group"><label class="form-label">Tipe Pelanggan</label><select class="form-control" id="trxTipePelanggan"><option value="UMUM">Umum</option></select></div>
+      </div>
+    </div>
+    <div class="card" style="position: relative; z-index: 40;">
+      <h3 class="card-title" style="margin-bottom:20px">📱 Data HP & Kerusakan</h3>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label required">Merk HP</label><select class="form-control" id="trxMerkHP"><option value="">— Pilih —</option></select></div>
+        <div class="form-group"><label class="form-label required">Tipe HP</label><input type="text" id="trxTipeHP" class="form-control" placeholder="iPhone 13..."></div>
+        <div class="form-group"><label class="form-label required">Kerusakan</label><input type="text" id="trxKerusakan" class="form-control" placeholder="LCD pecah..."></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label required">Penerima</label><select class="form-control" id="trxPenerima"></select></div>
+        <div class="form-group"><label class="form-label">Teknisi</label><select class="form-control" id="trxTeknisi"><option value="">— Pilih nanti —</option></select></div>
+        ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label required">Cabang</label><select class="form-control" id="trxCabang" onchange="onTrxCabangChange()"></select></div>`:''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">🔧 Barang / Sparepart</h3>
+        <button class="btn btn-sm btn-primary" onclick="addPartRow()">+ Tambah Barang</button></div>
+      <div class="table-container" style="overflow:visible; min-height:300px;"><table class="part-table" id="partTable"><thead><tr>
+        <th style="width:100px">Jenis</th><th style="width:100px">Kategori</th><th style="width:90px">Merk</th>
+        <th style="min-width:130px; width:25%">Nama Barang</th><th style="width:100px">Supplier</th>
+        <th style="width:65px">Qty</th><th style="width:100px">H.Beli</th><th style="width:100px">H.Jual</th><th style="width:35px"></th>
+      </tr></thead><tbody id="partTableBody"></tbody></table></div>
+      <div class="form-row" style="margin-top:16px">
+        <div class="form-group"><label class="form-label">Ongkos Kerja (Rp)</label>
+          <input type="number" id="trxOngkos" class="form-control" value="0" min="0" oninput="recalcTrx(true)"></div>
+        <div class="form-group"><label class="form-label">Komisi Teknisi (Rp)</label>
+          <input type="number" id="trxKomisi" class="form-control" value="0" min="0" oninput="recalcTrx(false)"></div>
+      </div>
+      <div class="calc-panel">
+        <div class="calc-row"><span class="calc-label">Total Modal</span><span class="calc-value" id="calcModal">Rp 0</span></div>
+        <div class="calc-row"><span class="calc-label">Total Jual</span><span class="calc-value" id="calcJual">Rp 0</span></div>
+        <div class="calc-row"><span class="calc-label">Ongkos Kerja</span><span class="calc-value" id="calcOngkos">Rp 0</span></div>
+        <div class="calc-row"><span class="calc-label">Laba Kotor</span><span class="calc-value" id="calcLabaKotor">Rp 0</span></div>
+        <div class="calc-row total"><span class="calc-label">Laba Bersih</span><span class="calc-value positive" id="calcLabaBersih">Rp 0</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:20px">💳 Pembayaran & Status</h3>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="trxStatus"></select></div>
+        <div class="form-group"><label class="form-label">Metode Bayar</label><select class="form-control" id="trxMetode"><option value="">— Nanti —</option><option value="CASH">Cash</option><option value="TRANSFER">Transfer</option><option value="BON">BON</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Garansi Service</label>
+          <select class="form-control" id="trxGaransi">
+            <option value="">Tidak Ada</option>
+            <option value="3 Hari">3 Hari</option>
+            <option value="1 Minggu">1 Minggu</option>
+            <option value="2 Minggu">2 Minggu</option>
+            <option value="1 Bulan">1 Bulan</option>
+            <option value="3 Bulan">3 Bulan</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:2"><label class="form-label">Catatan</label><textarea class="form-control" id="trxCatatan" rows="1"></textarea></div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:12px">
+        <button class="btn btn-primary btn-lg" onclick="submitTransaksi()">💾 Simpan Transaksi</button>
+        <button class="btn btn-outline" onclick="resetTrxForm()">🔄 Reset</button></div>
+    </div>`;
+  Loading.show('Memuat data...');
+  try {
+    trxFormData = await API.call('getTransaksiFormData', cab==='SEMUA'?'':cab);
+    populateTrxForm(); addPartRow();
+    setupAutocomplete('trxNama','trxNamaList',q=>API.call('autocompletePelanggan',q,10),item=>{document.getElementById('trxNama').value=item.nama;document.getElementById('trxTelepon').value=item.telepon||'';});
+  } catch(e){Toast.error('Gagal: '+e.message);}
+  Loading.hide();
+}
+
+function populateTrxForm(){
+  if(!trxFormData) return; const d=trxFormData;
+  
+  function updateSelect(id, html) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const val = el.value;
+    el.innerHTML = html;
+    if (val) el.value = val;
+  }
+
+  if(d.tipePelanggan) updateSelect('trxTipePelanggan', d.tipePelanggan.map(t=>`<option value="${t}">${t}</option>`).join(''));
+  if(d.merkHPList) updateSelect('trxMerkHP', '<option value="">— Pilih —</option>'+d.merkHPList.map(m=>`<option value="${m}">${m}</option>`).join(''));
+  if(d.penerima) updateSelect('trxPenerima', '<option value="">— Pilih —</option>'+d.penerima.map(k=>`<option value="${k.nama}">${k.nama} (${k.cabang})</option>`).join(''));
+  if(d.teknisi) updateSelect('trxTeknisi', '<option value="">— Pilih —</option>'+d.teknisi.map(k=>`<option value="${k.nama}">${k.nama} (${k.cabang})</option>`).join(''));
+  
+  const cs=document.getElementById('trxCabang'); 
+  if(cs && d.cabangList && cs.options.length <= 1) {
+    cs.innerHTML=d.cabangList.map(c=>`<option value="${c.id}">${c.id} - ${c.nama}</option>`).join('');
+  }
+  
+  if(d.statusList) updateSelect('trxStatus', d.statusList.map(s=>`<option value="${s}">${s.replace(/_/g, ' ')}</option>`).join(''));
+}
+
+function getCab(){return Session.isCabangLocked()?Session.getCabang():(document.getElementById('trxCabang')?.value||'');}
+function getStokCab(){
+  const c=getCab(); if(!trxFormData||!trxFormData.stokList) return [];
+  if(!c||c==='SEMUA') return trxFormData.stokList.filter(s=>s.stok>0);
+  return trxFormData.stokList.filter(s=>s.cabang===c&&s.stok>0);
+}
+
+// =================== BI-DIRECTIONAL CASCADE ===================
+let pRC=0;
+
+function addPartRow(){
+  pRC++; const rid=pRC, tbody=document.getElementById('partTableBody'), row=document.createElement('tr'); row.id='pR_'+rid;
+  // Populate initial dropdowns from ALL stock in this branch
+  const stok=getStokCab();
+  const jenisAll=[...new Set(stok.map(s=>s.jenisBarang).filter(v=>v))];
+  const katAll=[...new Set(stok.map(s=>s.subKategori).filter(v=>v))];
+  const merkAll=[...new Set(stok.map(s=>s.merkBarang).filter(v=>v))];
+  const supAll=[...new Set(stok.map(s=>s.supplier).filter(v=>v))];
+
+  row.innerHTML=`
+    <td><select class="pJenis" onchange="onFilter(${rid})"><option value="">Semua</option>${jenisAll.map(j=>`<option value="${j}">${j}</option>`).join('')}</select></td>
+    <td><select class="pKat" onchange="onFilter(${rid})"><option value="">Semua</option>${katAll.map(k=>`<option value="${k}">${k}</option>`).join('')}</select></td>
+    <td><select class="pMerk" onchange="onFilter(${rid})"><option value="">Semua</option>${merkAll.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></td>
+    <td><div class="autocomplete-wrapper"><input type="text" class="pNama" placeholder="🔍 Ketik/klik pilih..." onfocus="showNama(${rid})" oninput="showNama(${rid})">
+      <div class="autocomplete-list" id="pAC_${rid}"></div></div></td>
+    <td><select class="pSup"><option value="">—</option>${supAll.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></td>
+    <td><input type="number" class="pQty" value="1" min="1" oninput="recalcTrx(true)"></td>
+    <td><input type="number" class="pHB" value="0" min="0" oninput="recalcTrx(true)"></td>
+    <td><input type="number" class="pHJ" value="0" min="0" oninput="recalcTrx(true)"></td>
+    <td><button class="btn-remove-row" onclick="document.getElementById('pR_${rid}').remove();recalcTrx(true)">✕</button></td>`;
+  tbody.appendChild(row);
+}
+
+// When JENIS/KATEGORI/MERK changes → re-filter the OTHER dropdowns
+function onFilter(rid){
+  const row=document.getElementById('pR_'+rid);
+  const jVal=row.querySelector('.pJenis').value;
+  const kVal=row.querySelector('.pKat').value;
+  const mVal=row.querySelector('.pMerk').value;
+
+  // Get filtered stock
+  const stok=getStokCab().filter(s=>
+    (!jVal||s.jenisBarang===jVal)&&(!kVal||s.subKategori===kVal)&&(!mVal||s.merkBarang===mVal)
+  );
+
+  // Re-populate KATEGORI (keep current if still valid)
+  const katFiltered=[...new Set(stok.map(s=>s.subKategori).filter(v=>v))];
+  const kSel=row.querySelector('.pKat');
+  const kCur=kSel.value;
+  kSel.innerHTML='<option value="">Semua</option>'+katFiltered.map(k=>`<option value="${k}"${k===kCur?' selected':''}>${k}</option>`).join('');
+
+  // Re-populate MERK
+  const merkFiltered=[...new Set(stok.map(s=>s.merkBarang).filter(v=>v))];
+  const mSel=row.querySelector('.pMerk');
+  const mCur=mSel.value;
+  mSel.innerHTML='<option value="">Semua</option>'+merkFiltered.map(m=>`<option value="${m}"${m===mCur?' selected':''}>${m}</option>`).join('');
+
+  // Re-populate SUPPLIER
+  const supFiltered=[...new Set(stok.map(s=>s.supplier).filter(v=>v))];
+  const sSel=row.querySelector('.pSup');
+  const sCur=sSel.value;
+  sSel.innerHTML='<option value="">—</option>'+supFiltered.map(s=>`<option value="${s}"${s===sCur?' selected':''}>${s}</option>`).join('');
+
+  // If exactly 1 item matches, auto-fill everything
+  if(stok.length===1) autoFillFromMatch(row, stok[0]);
+}
+
+// Show NAMA list filtered by current JENIS/KATEGORI/MERK selections
+function showNama(rid){
+  const row=document.getElementById('pR_'+rid);
+  const input=row.querySelector('.pNama');
+  const q=input.value.trim().toUpperCase();
+  const jVal=row.querySelector('.pJenis').value;
+  const kVal=row.querySelector('.pKat').value;
+  const mVal=row.querySelector('.pMerk').value;
+
+  // Portal fix: div fixed ditempel ke body agar lepas dari backdrop-filter
+  const portalId = 'pAC_portal_'+rid;
+  let portal = document.getElementById(portalId);
+  if(!portal) {
+    portal = document.createElement('div');
+    portal.id = portalId;
+    portal.className = 'autocomplete-list';
+    portal.style.cssText = 'position:fixed;z-index:99999;pointer-events:auto;display:none;';
+    document.body.appendChild(portal);
+  }
+
+  function posPortal() {
+    const rect = input.getBoundingClientRect();
+    portal.style.left = rect.left + 'px';
+    portal.style.top = (rect.bottom + 2) + 'px';
+    portal.style.width = Math.max(rect.width, 320) + 'px';
+    portal.style.maxHeight = '300px';
+    portal.style.overflowY = 'auto';
+  }
+
+  const stok=getStokCab().filter(s=>{
+    const jenisOk=(!jVal||s.jenisBarang===jVal);
+    const katOk=(!kVal||s.subKategori===kVal);
+    const merkOk=(!mVal||s.merkBarang===mVal);
+    if(!jenisOk||!katOk||!merkOk) return false;
+    if(!q) return true;
+    const searchStr = (s.nama + ' ' + (s.merkBarang||'') + ' ' + (s.supplier||'') + ' ' + (s.persamaan||'')).toUpperCase();
+    return searchStr.indexOf(q)!==-1;
+  });
+
+  if(!stok.length){
+    portal.innerHTML='<div class="autocomplete-item" style="color:#94a3b8">Tidak ada barang</div>';
+    posPortal(); portal.style.display='block';
+    return;
+  }
+
+  // Show EACH batch as a separate result to avoid confusion
+  const results=stok.slice(0,25);
+
+  portal.innerHTML=results.map((s,i)=>{
+    const aliasLabel = (q && s.persamaan && s.persamaan.toUpperCase().indexOf(q)!==-1)
+      ? `<span style="color:#f59e0b;font-size:10px;background:rgba(245,158,11,0.15);padding:2px 6px;border-radius:10px;margin-left:4px">↩ via alias</span>`
+      : '';
+    return `<div class="autocomplete-item" data-idx="${i}">
+      <strong>${s.nama}</strong>
+      <span style="font-size:11px;color:#94a3b8;margin-left:6px">
+        ${s.merkBarang||'-'} | ${s.supplier||'-'} | Stok:<span style="color:${s.stok<=3?'#ef4444':'#10b981'}">${s.stok}</span> | Rp ${formatNumber(s.hargaJual)} ${aliasLabel}
+      </span>
+    </div>`;
+  }).join('');
+
+  portal.querySelectorAll('.autocomplete-item[data-idx]').forEach((el)=>{
+    el.onmousedown=(e)=>{
+      e.preventDefault();
+      const idx = el.getAttribute('data-idx');
+      const s = results[idx];
+      input.value=s.nama;
+      autoFillFromMatch(row, s);
+      portal.style.display='none';
+    };
+  });
+
+  portal.querySelectorAll('.autocomplete-item[data-idx]').forEach((el,i)=>{
+    el.onmousedown=(e)=>{
+      e.preventDefault();
+      if(i>=results.length) return;
+      const r=results[i];
+      input.value=r.nama;
+      row.dataset.aliasDigunakan = r.aliasMatch || '';
+      portal.style.display='none';
+
+      if(r.items.length===1){
+        // Only 1 match — auto-fill everything
+        autoFillFromMatch(row, r.items[0]);
+      } else {
+        // Multiple variants — filter dropdowns to show only matching options
+        const jList=[...new Set(r.items.map(s=>s.jenisBarang).filter(v=>v))];
+        const kList=[...new Set(r.items.map(s=>s.subKategori).filter(v=>v))];
+        const mList=[...new Set(r.items.map(s=>s.merkBarang).filter(v=>v))];
+        const sList=[...new Set(r.items.map(s=>s.supplier).filter(v=>v))];
+
+        const jSel=row.querySelector('.pJenis');
+        jSel.innerHTML='<option value="">— Pilih —</option>'+jList.map(j=>`<option value="${j}">${j}</option>`).join('');
+        if(jList.length===1) jSel.value=jList[0];
+
+        const kSel=row.querySelector('.pKat');
+        kSel.innerHTML='<option value="">— Pilih —</option>'+kList.map(k=>`<option value="${k}">${k}</option>`).join('');
+        if(kList.length===1) kSel.value=kList[0];
+
+        const mSel=row.querySelector('.pMerk');
+        mSel.innerHTML='<option value="">— Pilih —</option>'+mList.map(m=>`<option value="${m}">${m}</option>`).join('');
+        if(mList.length===1) mSel.value=mList[0];
+
+        const sSel=row.querySelector('.pSup');
+        sSel.innerHTML='<option value="">— Pilih —</option>'+sList.map(s=>`<option value="${s}">${s}</option>`).join('');
+        if(sList.length===1) sSel.value=sList[0];
+
+        // Check if after auto-select we have exactly 1 match
+        const finalMatch=r.items.filter(s=>
+          (!jSel.value||s.jenisBarang===jSel.value)&&(!kSel.value||s.subKategori===kSel.value)&&
+          (!mSel.value||s.merkBarang===mSel.value)&&(!sSel.value||s.supplier===sSel.value)
+        );
+        if(finalMatch.length===1) autoFillFromMatch(row, finalMatch[0]);
+      }
+    };
+  });
+  posPortal(); portal.style.display='block';
+  input.onblur = () => setTimeout(()=>{portal.style.display='none';}, 200);
+}
+
+
+function autoFillFromMatch(row, s){
+  row.querySelector('.pJenis').innerHTML=`<option value="${s.jenisBarang||''}">${s.jenisBarang||'-'}</option>`;
+  row.querySelector('.pKat').innerHTML=`<option value="${s.subKategori||''}">${s.subKategori||'-'}</option>`;
+  row.querySelector('.pMerk').innerHTML=`<option value="${s.merkBarang||''}">${s.merkBarang||'-'}</option>`;
+  row.querySelector('.pSup').innerHTML=`<option value="${s.supplier||''}">${s.supplier||'-'}</option>`;
+  row.querySelector('.pNama').value=s.nama;
+  row.querySelector('.pHB').value=s.hargaBeli||0;
+  row.querySelector('.pHJ').value=s.hargaJual||0;
+  recalcTrx(true);
+}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.autocomplete-wrapper'))document.querySelectorAll('.autocomplete-list').forEach(l=>l.classList.remove('show'));});
+
+function getPartRowsData(){
+  const parts=[];
+  document.querySelectorAll('#partTableBody tr').forEach(r=>{
+    const nama=r.querySelector('.pNama')?.value?.trim(); if(!nama) return;
+    parts.push({jenisBarang:r.querySelector('.pJenis')?.value||'',nama,subKategori:r.querySelector('.pKat')?.value||'',
+      merkBarang:r.querySelector('.pMerk')?.value||'',supplier:r.querySelector('.pSup')?.value||'',
+      qty:Number(r.querySelector('.pQty')?.value)||1,hargaBeli:Number(r.querySelector('.pHB')?.value)||0,
+      hargaJual:Number(r.querySelector('.pHJ')?.value)||0,
+      aliasDigunakan:r.dataset.aliasDigunakan||''
+    });
+  }); return parts;
+}
+
+
+function recalcTrx(autoKomisi=true){
+  const parts=getPartRowsData(), ongkos=Number(document.getElementById('trxOngkos')?.value)||0;
+  let tm=0,tj=0; parts.forEach(p=>{tm+=p.hargaBeli*p.qty;tj+=p.hargaJual*p.qty;});
+  const pend=tj+ongkos,lk=pend-tm;
+  if(autoKomisi){document.getElementById('trxKomisi').value=Math.round(lk*10/100);}
+  const km=Number(document.getElementById('trxKomisi')?.value)||0;
+  const lb=lk-km;
+  document.getElementById('calcModal').textContent=formatRupiah(tm);
+  document.getElementById('calcJual').textContent=formatRupiah(tj);
+  document.getElementById('calcOngkos').textContent=formatRupiah(ongkos);
+  document.getElementById('calcLabaKotor').textContent=formatRupiah(lk);
+  const el=document.getElementById('calcLabaBersih'); el.textContent=formatRupiah(lb); el.className='calc-value '+(lb>=0?'positive':'negative');
+}
+
+async function submitTransaksi(){
+    let finalCatatan = document.getElementById('trxCatatan')?.value || '';
+    const garansi = document.getElementById('trxGaransi')?.value;
+    if (garansi) finalCatatan = '[Garansi: ' + garansi + '] ' + finalCatatan;
+    
+    const data={cabang:getCab(),namaPelanggan:document.getElementById('trxNama')?.value?.trim(),
+    telepon:document.getElementById('trxTelepon')?.value?.trim(),tipePelanggan:document.getElementById('trxTipePelanggan')?.value,
+    merkHP:document.getElementById('trxMerkHP')?.value,tipeHP:document.getElementById('trxTipeHP')?.value?.trim(),
+    kerusakan:document.getElementById('trxKerusakan')?.value?.trim(),penerima:document.getElementById('trxPenerima')?.value,
+    teknisi:document.getElementById('trxTeknisi')?.value,parts:getPartRowsData(),
+    ongkosKerja:Number(document.getElementById('trxOngkos')?.value)||0,
+    komisiNominal:Number(document.getElementById('trxKomisi')?.value)||0,
+    status:document.getElementById('trxStatus')?.value,
+    metodeBayar:document.getElementById('trxMetode')?.value,catatan:finalCatatan,createdBy:Session.getUsername()};
+  if(!data.namaPelanggan||!data.tipeHP||!data.kerusakan||!data.penerima){Toast.warning('Lengkapi: Nama, Tipe HP, Kerusakan, Penerima');return;}
+  Loading.show('Menyimpan...');
+  try{
+    const r=await API.call('saveTransaksi',data);
+    Loading.hide();
+    if(r.success){
+      Toast.success(r.message+' ID: '+r.id);
+      resetTrxForm();
+      const doPrint = await Modal.confirm('Cetak Nota?', 'Transaksi berhasil disimpan. Cetak struk/nota sekarang?');
+      if(doPrint) printNota(r.id);
+    }else { Toast.error(r.message); }
+  }catch(e){
+    Loading.hide();
+    Toast.error('Error: '+e.message);
+  }
+}
+
+function resetTrxForm(){
+  ['trxNama','trxTelepon','trxTipeHP','trxKerusakan','trxCatatan','trxGaransi'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('trxOngkos').value='0';
+  document.getElementById('trxKomisi').value='0';
+  document.getElementById('partTableBody').innerHTML=''; pRC=0; addPartRow(); recalcTrx(true);
+}
+
+function onTrxCabangChange(){
+  const c=document.getElementById('trxCabang')?.value;
+  if(c){
+    Session.setActiveViewCabang(c);
+    if(typeof updateBranchStyle==='function') updateBranchStyle(c);
+    API.call('getTransaksiFormData',c).then(d=>{
+      trxFormData=d;
+      populateTrxForm();
+      // Re-populate part rows with new branch stock
+      document.getElementById('partTableBody').innerHTML=''; pRC=0; addPartRow();
+    });
+  }
+}
+</script>
