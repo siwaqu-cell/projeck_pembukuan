@@ -1,0 +1,1100 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Buku Panduan Lengkap ServicePro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 40px; }
+        h1 { color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin-top: 40px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        h3 { color: #16a085; margin-top: 30px; }
+        h4 { color: #8e44ad; }
+        pre { background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #e9ecef; }
+        code { background-color: #f8f9fa; padding: 2px 4px; border-radius: 3px; color: #e74c3c; font-family: Consolas, monospace; }
+        blockquote { border-left: 4px solid #3498db; padding-left: 15px; color: #555; background: #f4f9fd; padding: 15px; margin-left: 0; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .page-break { page-break-before: always; margin-top: 50px; }
+        img { max-width: 100%; height: auto; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        @media print {
+            body { padding: 0; max-width: 100%; background: white; }
+            .page-break { page-break-before: always; margin-top: 0; }
+            pre, blockquote { border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+<h1>📖 BUKU PANDUAN LENGKAP SERVICEPRO HP v5.1</h1>
+<p>Dokumen ini adalah <strong>Buku Panduan Resmi</strong> dari A sampai Z untuk aplikasi ServicePro HP yang telah dibangun. Dokumen ini mencakup cara penggunaan, daftar fitur, hingga arsitektur teknis.</p>
+<hr />
+<div class="page-break"></div>
+
+<h1>📱 ServicePro HP v5.1 — Manual Owner</h1>
+<blockquote>
+<p><strong>Versi:</strong> 5.1 | <strong>Platform:</strong> Google Apps Script (Web App) | <strong>Database:</strong> Google Sheets</p>
+</blockquote>
+<hr />
+<h2>🏢 GAMBARAN SISTEM</h2>
+<p>ServicePro HP adalah sistem manajemen toko servis HP <strong>multi-cabang</strong> berbasis web. Data tersimpan di Google Sheets — tidak perlu install aplikasi, bisa diakses dari HP atau laptop mana saja.</p>
+<h3>Cabang yang Didukung</h3>
+<table>
+<thead>
+<tr>
+<th>Kode</th>
+<th>Nama</th>
+<th>Warna</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SIB</td>
+<td>Cabang SIB</td>
+<td>Biru</td>
+</tr>
+<tr>
+<td>BL</td>
+<td>Cabang BL</td>
+<td>Ungu</td>
+</tr>
+<tr>
+<td>LJ</td>
+<td>Cabang LJ</td>
+<td>Emas</td>
+</tr>
+<tr>
+<td>AF</td>
+<td>Cabang AF</td>
+<td>Merah</td>
+</tr>
+</tbody>
+</table>
+<h3>Hak Akses (Role)</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Akses</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OWNER</strong></td>
+<td>Semua fitur + laporan keuangan + void transaksi + semua cabang</td>
+</tr>
+<tr>
+<td><strong>ADMIN</strong></td>
+<td>Semua fitur operasional kecuali laporan laba &amp; void</td>
+</tr>
+<tr>
+<td><strong>TEKNISI</strong></td>
+<td>Input transaksi &amp; update status saja</td>
+</tr>
+</tbody>
+</table>
+<h3>URL Akses</h3>
+<ul>
+<li><strong>URL <code>/dev</code></strong> → Untuk testing (perubahan langsung aktif)</li>
+<li><strong>URL <code>/exec</code></strong> → Untuk karyawan (stabil, tidak berubah tiba-tiba)</li>
+</ul>
+<hr />
+<h2>📋 DAFTAR FITUR LENGKAP</h2>
+<h3>A. OPERASIONAL HARIAN</h3>
+<h4>1. 📊 Dashboard</h4>
+<ul>
+<li>KPI: Total servis hari ini, omzet, stok rendah, transaksi pending</li>
+<li>Grafik performa per cabang</li>
+<li>Notifikasi stok hampir habis</li>
+<li><strong>Filter:</strong> Per cabang, per tanggal</li>
+</ul>
+<h4>2. 💵 Manajemen Kasir</h4>
+<ul>
+<li>Buka laci (input modal awal)</li>
+<li>Tutup toko (setor kas ke owner)</li>
+<li>Catat pengeluaran harian (listrik, air, dll)</li>
+<li>Lihat riwayat kas hari ini (CASH &amp; TRANSFER)</li>
+</ul>
+<h4>3. ➕ Transaksi Baru (Servis)</h4>
+<ul>
+<li>Input: Nama pelanggan, nomor WA, tipe HP, kerusakan</li>
+<li>Pilih teknisi dan cabang</li>
+<li>Tambah part yang digunakan + harga</li>
+<li>Input ongkos kerja &amp; metode bayar</li>
+<li>Pilih garansi servis (LCD, Baterai, Kamera, dll)</li>
+<li>Cetak nota langsung setelah input</li>
+</ul>
+<h4>4. 🛒 Penjualan Aksesoris</h4>
+<ul>
+<li>Jual aksesoris/part retail (bukan servis)</li>
+<li>Hitung laba otomatis (harga jual − modal)</li>
+<li>Terintegrasi ke kas harian</li>
+</ul>
+<h4>5. 🔄 Update Status</h4>
+<ul>
+<li>Cari transaksi by ID atau nama pelanggan</li>
+<li>Update status: Antri → Proses → Selesai → Diambil</li>
+<li><strong>✏️ Edit Transaksi</strong> — ubah nama, HP, kerusakan tanpa hapus</li>
+<li><strong>🔧 Edit Part</strong> — ubah part/harga tanpa hapus transaksi</li>
+<li><strong>🗑️ Hapus/Void</strong> <em>(khusus OWNER/ADMIN)</em> — stok dikembalikan, kas di-reverse</li>
+<li>Lunasi BON (transaksi kredit)</li>
+<li>Cetak ulang nota</li>
+</ul>
+<hr />
+<h3>B. STOK &amp; PEMBELIAN</h3>
+<h4>6. 📦 Pembelian Part</h4>
+<ul>
+<li>Input pembelian dari supplier</li>
+<li>Stok otomatis bertambah</li>
+<li>Hutang supplier tercatat</li>
+<li>Terintegrasi kas keluar</li>
+</ul>
+<h4>7. ↩️ Return Supplier</h4>
+<ul>
+<li>Return part rusak/salah ke supplier</li>
+<li>Pilih: Cash Refund (kas masuk) atau Kredit</li>
+<li>Stok otomatis berkurang</li>
+</ul>
+<h4>8. 🔀 Transfer Cabang</h4>
+<ul>
+<li>Kirim stok antar cabang (misal: SIB → BL)</li>
+<li>Stok cabang asal berkurang, cabang tujuan bertambah</li>
+<li>Tercatat di riwayat part</li>
+</ul>
+<hr />
+<h3>C. DATA &amp; LAPORAN</h3>
+<h4>9. 🗂️ Master Data <em>(Khusus Owner/Admin)</em></h4>
+<p><strong>Tab Cabang:</strong> CRUD data cabang (nama, alamat, telepon)</p>
+<p><strong>Tab Karyawan:</strong> CRUD karyawan (nama, peran, cabang, komisi %)</p>
+<p><strong>Tab Part/Stok:</strong> 
+- Tambah barang baru
+- Edit nama, harga beli, harga jual, stok, supplier
+- Hapus/nonaktifkan barang
+- Filter per cabang</p>
+<p><strong>Tab Dropdown:</strong> Edit isi dropdown (jenis barang, merk, dll)</p>
+<p><strong>Tab Pengguna:</strong> Kelola akun login (username, password, role)</p>
+<h4>10. 💰 Laporan Kas</h4>
+<ul>
+<li>Semua transaksi kas masuk &amp; keluar</li>
+<li>Filter: per cabang, per tanggal, per metode bayar</li>
+<li>Input pengeluaran operasional (OPEX)</li>
+<li>Export CSV</li>
+</ul>
+<h4>11. 📦 Laporan Stok</h4>
+<ul>
+<li>Daftar semua stok aktif per cabang</li>
+<li>Indikator <strong>🔴 HABIS</strong> (stok = 0) dan kuning (stok ≤ 3)</li>
+<li>Nilai modal total stok</li>
+<li>Filter per cabang &amp; tanggal</li>
+<li>Export CSV → langsung ke Master Data untuk edit</li>
+</ul>
+<h4>12. 📋 Stock Opname</h4>
+<ul>
+<li>Bandingkan stok sistem vs stok fisik</li>
+<li>Cetak laporan opname untuk pengecekan manual</li>
+</ul>
+<h4>13. 📊 Laporan Lengkap</h4>
+<ul>
+<li>KPI: Pendapatan, Pengeluaran Part, Laba Bersih</li>
+<li>Kinerja per teknisi (jumlah servis, revenue, komisi)</li>
+<li>Top 10 pelanggan terbaik</li>
+<li>Daftar transaksi rugi/nihil margin</li>
+</ul>
+<h4>14. 📈 Laporan Laba Rugi <em>(Khusus Owner)</em></h4>
+<ul>
+<li>Rincian pendapatan: jasa servis, ongkos kerja, penjualan aksesoris</li>
+<li>Rincian pengeluaran: modal part, komisi teknisi, OPEX</li>
+<li>Laba Kotor, Laba Bersih per periode</li>
+<li>Filter per cabang &amp; tanggal range</li>
+</ul>
+<h4>15. 🔧 Laporan Servisan</h4>
+<ul>
+<li>Daftar semua unit servis masuk</li>
+<li>Filter: cabang, status, tanggal, cari nama/ID</li>
+<li>Breakdown status per cabang (tabel ringkasan)</li>
+<li>KPI: Total unit, selesai, proses, batal</li>
+<li>Kolom keuangan: H.Jual Part, Ongkos, Modal, Laba Kotor, Komisi, Laba Bersih</li>
+<li>Klik baris → langsung buka detail di Update Status</li>
+</ul>
+<h4>16. 🏠 Ringkasan Tutup Toko <em>(Fitur Utama Owner)</em></h4>
+<p>Menjawab: <strong>"Hari ini uang di laci harus dibagi berapa?"</strong>
+- <strong>🏭 Uang Part per Supplier</strong> → Rp berapa yang harus disisihkan untuk bayar Supplier A, B, dll
+- <strong>👨‍🔧 Ongkos Jasa per Teknisi</strong> → Berapa ongkos yang terkumpul dari masing-masing teknisi
+- <strong>🛒 Pembelian hari ini</strong> → Part yang sudah dibeli &amp; dibayar
+- <strong>💰 Saldo Kas</strong> → Total masuk, keluar, saldo akhir
+- <strong>Panduan visual pembagian:</strong> Sisihkan Part + Ongkos Teknisi = Laba Toko</p>
+<h4>17. 📋 Riwayat Part</h4>
+<ul>
+<li>Semua pergerakan stok: masuk, keluar, transfer</li>
+<li>Filter: supplier, kategori, merk, tanggal</li>
+<li>Export CSV</li>
+</ul>
+<h4>18. 📥 Import Stok</h4>
+<ul>
+<li>Upload CSV untuk input stok massal</li>
+<li>Mendukung backdate (tanggal pembelian historis)</li>
+<li>Template CSV tersedia untuk diunduh</li>
+</ul>
+<h4>19. ⚠️ Pembatalan / Void <em>(Khusus Owner)</em></h4>
+<ul>
+<li>Void transaksi yang bermasalah</li>
+<li>Otomatis: stok dikembalikan + kas di-reverse</li>
+<li>Tercatat di activity log</li>
+</ul>
+<hr />
+<h2>💰 PANDUAN TUTUP TOKO HARIAN</h2>
+<h3>Alur yang Disarankan:</h3>
+<ol>
+<li><strong>Buka</strong> → Menu <strong>Ringkasan Tutup Toko</strong>, pilih cabang &amp; tanggal hari ini</li>
+<li><strong>Lihat</strong> tabel <strong>Uang Part per Supplier</strong> → pisahkan uang tersebut secara fisik</li>
+<li><strong>Lihat</strong> tabel <strong>Ongkos Jasa per Teknisi</strong> → catat untuk perhitungan gaji/komisi</li>
+<li><strong>Buka</strong> → Menu <strong>Manajemen Kasir</strong> → klik <strong>Tutup Toko (Setor ke Owner)</strong></li>
+<li><strong>Input</strong> jumlah yang disetor → sistem otomatis hitung sisa laci</li>
+</ol>
+<h3>Rumus Pembagian:</h3>
+<pre><code>Uang di Laci = Sisihkan Part + Ongkos Teknisi + Laba Toko + Modal Awal
+</code></pre>
+<hr />
+<h2>🔧 TROUBLESHOOTING</h2>
+<table>
+<thead>
+<tr>
+<th>Masalah</th>
+<th>Solusi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dashboard blank/loading terus</td>
+<td>Refresh halaman (F5). Jika masih, buka URL <code>/dev</code></td>
+</tr>
+<tr>
+<td>Laporan stok kosong</td>
+<td>Pastikan data di Master Data → Part/Stok ada &amp; STATUS = AKTIF</td>
+</tr>
+<tr>
+<td>Export CSV berantakan</td>
+<td>Buka di Excel: Data → From Text/CSV → pilih delimiter koma</td>
+</tr>
+<tr>
+<td>Stok tidak berkurang setelah transaksi</td>
+<td>Cek apakah nama part di transaksi sama persis dengan nama di master stok</td>
+</tr>
+<tr>
+<td>Transaksi tidak masuk kas</td>
+<td>Pastikan status diupdate ke SELESAI_DIAMBIL dan metode bayar terisi</td>
+</tr>
+<tr>
+<td>Salah input transaksi</td>
+<td>Update Status → cari ID → tombol ✏️ Edit Transaksi atau 🔧 Edit Part</td>
+</tr>
+<tr>
+<td>Transaksi harus dihapus</td>
+<td>Update Status → cari ID → tombol 🗑️ Hapus/Void <em>(hanya Owner)</em></td>
+</tr>
+<tr>
+<td>Stok salah jumlah</td>
+<td>Master Data → Tab Part/Stok → Edit → ubah angka stok langsung</td>
+</tr>
+<tr>
+<td>Lupa password karyawan</td>
+<td>Master Data → Tab Pengguna → Edit → ganti password</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>📊 KEBUTUHAN YANG TERPENUHI</h2>
+<table>
+<thead>
+<tr>
+<th>Kebutuhan</th>
+<th>Fitur</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lacak servis masuk per cabang</td>
+<td>Laporan Servisan</td>
+</tr>
+<tr>
+<td>Pisah uang part &amp; jasa saat tutup toko</td>
+<td>Ringkasan Tutup Toko</td>
+</tr>
+<tr>
+<td>Uang part per supplier</td>
+<td>Ringkasan Tutup Toko → Tabel Supplier</td>
+</tr>
+<tr>
+<td>Uang jasa per teknisi</td>
+<td>Ringkasan Tutup Toko → Tabel Teknisi</td>
+</tr>
+<tr>
+<td>Laporan laba rugi detail</td>
+<td>Laporan Laba Rugi</td>
+</tr>
+<tr>
+<td>Kelola stok multi-cabang</td>
+<td>Master Data + Laporan Stok</td>
+</tr>
+<tr>
+<td>Transfer stok antar cabang</td>
+<td>Transfer Cabang</td>
+</tr>
+<tr>
+<td>Lacak hutang supplier</td>
+<td>Pembelian → Hutang Supplier</td>
+</tr>
+<tr>
+<td>Edit transaksi tanpa hapus</td>
+<td>Update Status → Edit Transaksi / Edit Part</td>
+</tr>
+<tr>
+<td>Hapus transaksi selesai</td>
+<td>Update Status → Hapus/Void</td>
+</tr>
+<tr>
+<td>Export data ke Excel</td>
+<td>Semua laporan → tombol 📥 Export CSV</td>
+</tr>
+<tr>
+<td>Garansi servis</td>
+<td>Form Transaksi Baru → pilih garansi</td>
+</tr>
+<tr>
+<td>Cetak nota</td>
+<td>Update Status → 🖨️ Cetak Nota</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<div class="page-break"></div>
+
+<h1>📱 ServicePro HP v5.1 — Panduan Karyawan</h1>
+<blockquote>
+<p>Baca ini sebelum mulai bekerja. Simpan di HP Anda!</p>
+</blockquote>
+<hr />
+<h2>🔑 LOGIN</h2>
+<ol>
+<li>Buka URL yang diberikan oleh Owner</li>
+<li>Masukkan <strong>Username</strong> dan <strong>Password</strong> Anda</li>
+<li>Klik <strong>Masuk</strong></li>
+</ol>
+<blockquote>
+<p>⚠️ Jangan berbagi password dengan siapapun!</p>
+</blockquote>
+<hr />
+<h2>🏠 HALAMAN UTAMA (DASHBOARD)</h2>
+<p>Setelah login, Anda akan melihat Dashboard yang menampilkan:
+- Jumlah servis hari ini
+- Status transaksi (antri, proses, selesai)
+- Stok yang hampir habis (perlu dilaporkan ke owner)</p>
+<hr />
+<h2>📋 PEKERJAAN HARIAN</h2>
+<h3>1. BUKA TOKO (Pagi)</h3>
+<p><strong>Menu: 💵 Manajemen Kasir</strong>
+1. Pilih cabang Anda
+2. Pilih <strong>"Buka Laci (Modal Awal)"</strong>
+3. Input jumlah uang modal awal yang diterima dari owner
+4. Klik <strong>Proses Modal Awal</strong></p>
+<hr />
+<h3>2. INPUT TRANSAKSI SERVIS BARU</h3>
+<p><strong>Menu: ➕ Transaksi Baru</strong></p>
+<p><strong>Langkah:</strong>
+1. Isi <strong>Nama Pelanggan</strong> dan <strong>Nomor WA</strong>
+2. Isi <strong>Tipe HP</strong> (contoh: iPhone 13, Samsung A52)
+3. Isi <strong>Kerusakan</strong> yang dilaporkan pelanggan
+4. Pilih <strong>Teknisi</strong> yang mengerjakan
+5. Tambah <strong>Part</strong> yang digunakan (klik + Tambah Part)
+   - Pilih nama part dari dropdown
+   - Isi harga jual
+6. Isi <strong>Ongkos Kerja</strong>
+7. Pilih <strong>Metode Bayar</strong> (CASH / TRANSFER / BON)
+8. Pilih <strong>Garansi</strong> jika ada
+9. Klik <strong>💾 Simpan Transaksi</strong>
+10. Cetak nota jika pelanggan minta</p>
+<blockquote>
+<p>💡 <strong>BON</strong> = pelanggan bayar nanti (kredit)</p>
+</blockquote>
+<hr />
+<h3>3. UPDATE STATUS SERVIS</h3>
+<p><strong>Menu: 🔄 Update Status</strong></p>
+<p>Gunakan ini untuk:
+- Memberitahu pelanggan HP sudah selesai
+- Update ketika pelanggan sudah ambil dan bayar</p>
+<p><strong>Langkah:</strong>
+1. Ketik <strong>ID Transaksi</strong> atau <strong>Nama Pelanggan</strong> di kolom cari
+2. Klik baris transaksi yang muncul
+3. Di panel detail, pilih <strong>Status Baru</strong>:
+   - <code>ANTRI</code> → baru diterima, belum dikerjakan
+   - <code>SEDANG_PROSES</code> → sedang dikerjakan teknisi
+   - <code>SELESAI_BELUM_DIAMBIL</code> → sudah selesai, belum diambil pelanggan
+   - <code>SELESAI_DIAMBIL</code> → sudah diambil dan sudah dibayar ✅
+   - <code>BATAL</code> → pelanggan batalkan servis
+4. Tambahkan catatan jika perlu
+5. Klik <strong>💾 Update Status</strong></p>
+<p><strong>Jika ada pelanggan BON yang mau bayar:</strong>
+1. Cari transaksinya
+2. Klik tombol <strong>💰 Lunasi BON</strong>
+3. Pilih metode pembayaran
+4. Klik Konfirmasi</p>
+<hr />
+<h3>4. JUAL AKSESORIS / PART RETAIL</h3>
+<p><strong>Menu: 🛒 Penjualan Aksesoris</strong></p>
+<ol>
+<li>Pilih nama barang dari dropdown</li>
+<li>Isi jumlah yang dibeli</li>
+<li>Isi harga jual</li>
+<li>Pilih metode bayar</li>
+<li>Klik Simpan</li>
+</ol>
+<hr />
+<h3>5. CATAT PENGELUARAN</h3>
+<p><strong>Menu: 💵 Manajemen Kasir</strong></p>
+<p>Jika ada pengeluaran (beli minum, fotokopi, dll):
+1. Pilih cabang
+2. Isi <strong>Jumlah Pengeluaran</strong>
+3. Pilih <strong>Sumber Dana</strong> (CASH atau TRANSFER)
+4. Isi <strong>Keterangan</strong> (wajib! contoh: "Beli air minum")
+5. Klik <strong>Catat Pengeluaran</strong></p>
+<hr />
+<h3>6. TUTUP TOKO (Sore/Malam)</h3>
+<p><strong>Menu: 💵 Manajemen Kasir</strong></p>
+<ol>
+<li>Pilih cabang</li>
+<li>Pilih <strong>"Tutup Toko (Setor ke Owner)"</strong></li>
+<li>Isi jumlah uang tunai yang disetor ke owner</li>
+<li>Klik <strong>Proses Setor Tunai</strong></li>
+</ol>
+<blockquote>
+<p>⚠️ Lakukan ini setiap hari sebelum pulang!</p>
+</blockquote>
+<hr />
+<h2>✏️ JIKA ADA KESALAHAN INPUT</h2>
+<h3>Salah nama pelanggan / tipe HP / kerusakan:</h3>
+<ol>
+<li>Buka <strong>🔄 Update Status</strong></li>
+<li>Cari transaksi</li>
+<li>Klik tombol <strong>✏️ Edit Transaksi</strong></li>
+<li>Ubah data yang salah → Simpan</li>
+</ol>
+<h3>Salah input part / harga:</h3>
+<ol>
+<li>Buka <strong>🔄 Update Status</strong></li>
+<li>Cari transaksi</li>
+<li>Klik tombol <strong>🔧 Edit Part</strong></li>
+<li>Ubah part/harga → Simpan</li>
+</ol>
+<blockquote>
+<p>⚠️ Tidak bisa hapus transaksi sendiri — minta bantu Owner!</p>
+</blockquote>
+<hr />
+<h2>📦 CEK STOK</h2>
+<p><strong>Menu: 📦 Laporan Stok</strong></p>
+<ul>
+<li>Klik <strong>🔍 Tampilkan</strong> untuk lihat semua stok</li>
+<li>Stok merah = <strong>HABIS</strong> → segera lapor ke owner/admin</li>
+<li>Stok kuning = hampir habis → perlu restock</li>
+</ul>
+<hr />
+<h2>❗ HAL YANG DILARANG</h2>
+<table>
+<thead>
+<tr>
+<th>Dilarang</th>
+<th>Alasan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Berbagi akun login</td>
+<td>Setiap aktivitas tercatat per user</td>
+</tr>
+<tr>
+<td>Input transaksi fiktif</td>
+<td>Semua data diaudit owner</td>
+</tr>
+<tr>
+<td>Tidak catat pengeluaran</td>
+<td>Menyebabkan selisih kas</td>
+</tr>
+<tr>
+<td>Tutup toko tanpa klik Tutup di sistem</td>
+<td>Kas tidak tersinkron</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🆘 HUBUNGI OWNER/ADMIN JIKA:</h2>
+<ul>
+<li>Tidak bisa login</li>
+<li>Ada transaksi yang harus dihapus</li>
+<li>Stok tidak sesuai dengan fisik</li>
+<li>Ada error merah di layar</li>
+<li>Tidak bisa cetak nota</li>
+</ul>
+<hr />
+<div class="page-break"></div>
+
+<h1>🗺️ ServicePro HP v5.1 — Blueprint Sistem</h1>
+<hr />
+<h2>🏗️ ARSITEKTUR SISTEM</h2>
+<pre><code>┌─────────────────────────────────────────────────┐
+│              BROWSER (Web App)                  │
+│  HTML + CSS + JavaScript (Google Apps Script)   │
+│  URL: script.google.com/macros/s/.../exec       │
+└──────────────────────┬──────────────────────────┘
+                       │ google.script.run
+                       ▼
+┌─────────────────────────────────────────────────┐
+│         GOOGLE APPS SCRIPT (Backend)            │
+│  Code.gs │ DataHelper.gs │ TransaksiHelper.gs   │
+│  RiwayatHelper.gs │ StatusHelper.gs │ dll        │
+└──────────────────────┬──────────────────────────┘
+                       │ SpreadsheetApp
+                       ▼
+┌─────────────────────────────────────────────────┐
+│            GOOGLE SHEETS (Database)             │
+│  20+ Sheet tab sebagai tabel database           │
+└─────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2>🗄️ STRUKTUR DATABASE (Google Sheets)</h2>
+<h3>Master Data</h3>
+<table>
+<thead>
+<tr>
+<th>Sheet</th>
+<th>Fungsi</th>
+<th>Kolom Utama</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CABANG</code></td>
+<td>Data cabang</td>
+<td>ID, NAMA, ALAMAT, TELEPON, STATUS</td>
+</tr>
+<tr>
+<td><code>KARYAWAN</code></td>
+<td>Data karyawan</td>
+<td>ID, NAMA, PERAN, CABANG, TELEPON, STATUS, KOMISI_PERSEN</td>
+</tr>
+<tr>
+<td><code>STOK_PART</code></td>
+<td>Inventori part</td>
+<td>ID, NAMA_PART, JENIS_BARANG, SUB_KATEGORI, MERK_BARANG, SUPPLIER, HARGA_BELI, HARGA_JUAL, STOK, CABANG, STATUS</td>
+</tr>
+<tr>
+<td><code>USERS</code></td>
+<td>Akun login</td>
+<td>USERNAME, PASSWORD_HASH, NAMA, PERAN, CABANG</td>
+</tr>
+<tr>
+<td><code>CONFIG</code></td>
+<td>Konfigurasi</td>
+<td>KEY, VALUE</td>
+</tr>
+<tr>
+<td><code>PELANGGAN</code></td>
+<td>Data pelanggan</td>
+<td>ID, NAMA, TELEPON, CABANG</td>
+</tr>
+</tbody>
+</table>
+<h3>Transaksi</h3>
+<table>
+<thead>
+<tr>
+<th>Sheet</th>
+<th>Fungsi</th>
+<th>Kolom Utama</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TRANSAKSI</code></td>
+<td>Header servis</td>
+<td>ID_TRANSAKSI, TGL_MASUK, NAMA_PELANGGAN, TELEPON, TIPE_HP, KERUSAKAN, TEKNISI, CABANG, STATUS, HARGA_JUAL, ONGKOS_KERJA, TOTAL_MODAL, LABA_KOTOR, KOMISI, LABA_BERSIH, METODE_BAYAR</td>
+</tr>
+<tr>
+<td><code>TRANSAKSI_DETAIL</code></td>
+<td>Part per servis</td>
+<td>ID_DETAIL, ID_TRANSAKSI, NAMA_PART, QTY, HARGA_BELI, HARGA_JUAL, SUPPLIER</td>
+</tr>
+<tr>
+<td><code>PENJUALAN</code></td>
+<td>Penjualan retail</td>
+<td>ID_PENJUALAN, TANGGAL, NAMA_PELANGGAN, CABANG, TOTAL_JUAL, TOTAL_MODAL, LABA_KOTOR</td>
+</tr>
+<tr>
+<td><code>PENJUALAN_DETAIL</code></td>
+<td>Item penjualan</td>
+<td>ID_DETAIL, ID_PENJUALAN, NAMA_PART, QTY, HARGA_BELI, HARGA_JUAL</td>
+</tr>
+</tbody>
+</table>
+<h3>Keuangan</h3>
+<table>
+<thead>
+<tr>
+<th>Sheet</th>
+<th>Fungsi</th>
+<th>Kolom Utama</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KAS_HARIAN</code></td>
+<td>Aliran kas cabang</td>
+<td>ID, TANGGAL, CABANG, JENIS (MASUK/KELUAR), JUMLAH, METODE_BAYAR, KATEGORI, SUMBER, KETERANGAN</td>
+</tr>
+<tr>
+<td><code>KAS_PUSAT</code></td>
+<td>Kas pusat owner</td>
+<td>ID, TANGGAL, JENIS, JUMLAH, KETERANGAN</td>
+</tr>
+<tr>
+<td><code>PIUTANG</code></td>
+<td>BON belum lunas</td>
+<td>ID, ID_TRANSAKSI, NAMA_PELANGGAN, CABANG, JUMLAH, STATUS</td>
+</tr>
+<tr>
+<td><code>HUTANG_SUPPLIER</code></td>
+<td>Hutang ke supplier</td>
+<td>ID, TANGGAL, SUPPLIER, CABANG, JUMLAH, STATUS</td>
+</tr>
+</tbody>
+</table>
+<h3>Stok &amp; Logistik</h3>
+<table>
+<thead>
+<tr>
+<th>Sheet</th>
+<th>Fungsi</th>
+<th>Kolom Utama</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PEMBELIAN</code></td>
+<td>Pembelian part</td>
+<td>ID, TANGGAL, SUPPLIER, CABANG, NAMA_PART, QTY, HARGA_BELI, TOTAL_BELI</td>
+</tr>
+<tr>
+<td><code>RETURN_SUPPLIER</code></td>
+<td>Return ke supplier</td>
+<td>ID, TANGGAL, SUPPLIER, CABANG, NAMA_PART, QTY, ALASAN</td>
+</tr>
+<tr>
+<td><code>RIWAYAT_PART</code></td>
+<td>Semua pergerakan stok</td>
+<td>ID, TANGGAL, JENIS_TRANSAKSI, NAMA_PART, CABANG, QTY, TIPE (MASUK/KELUAR), ID_REFERENSI</td>
+</tr>
+<tr>
+<td><code>TRANSFER_PART</code></td>
+<td>Transfer antar cabang</td>
+<td>ID, TANGGAL, CABANG_ASAL, CABANG_TUJUAN, NAMA_PART, QTY</td>
+</tr>
+</tbody>
+</table>
+<h3>Log</h3>
+<table>
+<thead>
+<tr>
+<th>Sheet</th>
+<th>Fungsi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACTIVITY_LOG</code></td>
+<td>Audit trail semua aksi user</td>
+</tr>
+<tr>
+<td><code>ABSENSI</code></td>
+<td>Absensi karyawan</td>
+</tr>
+<tr>
+<td><code>PENGGAJIAN</code></td>
+<td>Data penggajian</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🔄 ALUR DATA UTAMA</h2>
+<h3>Alur Transaksi Servis</h3>
+<pre><code>Input Form ──► TRANSAKSI (header) + TRANSAKSI_DETAIL (part)
+                    │
+                    ├──► STOK_PART (STOK berkurang)
+                    ├──► RIWAYAT_PART (KELUAR tercatat)
+                    ├──► KAS_HARIAN (MASUK saat status=SELESAI_DIAMBIL)
+                    └──► PIUTANG (jika metode=BON)
+</code></pre>
+<h3>Alur Pembelian Part</h3>
+<pre><code>Input Pembelian ──► PEMBELIAN (record)
+                        │
+                        ├──► STOK_PART (STOK bertambah)
+                        ├──► RIWAYAT_PART (MASUK tercatat)
+                        ├──► KAS_HARIAN (KELUAR jika bayar tunai)
+                        └──► HUTANG_SUPPLIER (jika kredit)
+</code></pre>
+<h3>Alur Return Supplier</h3>
+<pre><code>Input Return ──► RETURN_SUPPLIER (record)
+                     │
+                     ├──► STOK_PART (STOK berkurang)
+                     ├──► RIWAYAT_PART (KELUAR tercatat)
+                     └──► KAS_HARIAN (MASUK jika cash refund)
+</code></pre>
+<h3>Alur Transfer Cabang</h3>
+<pre><code>Input Transfer ──► TRANSFER_PART (record)
+                       │
+                       ├──► STOK_PART cabang ASAL (STOK berkurang)
+                       ├──► STOK_PART cabang TUJUAN (STOK bertambah)
+                       └──► RIWAYAT_PART (TRANSFER_KELUAR + TRANSFER_MASUK)
+</code></pre>
+<hr />
+<h2>📁 STRUKTUR FILE KODE</h2>
+<h3>Backend (.gs)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Fungsi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Code.gs</code></td>
+<td>Entry point, routing, konstanta global</td>
+</tr>
+<tr>
+<td><code>DataHelper.gs</code></td>
+<td>Fungsi baca/tulis Google Sheets (CRUD dasar)</td>
+</tr>
+<tr>
+<td><code>TransaksiHelper.gs</code></td>
+<td>Simpan transaksi, pembelian, retur, pengeluaran</td>
+</tr>
+<tr>
+<td><code>StatusHelper.gs</code></td>
+<td>Update status, dashboard data, edit transaksi</td>
+</tr>
+<tr>
+<td><code>RiwayatHelper.gs</code></td>
+<td>Laporan stok, laporan lengkap, laporan servisan, ringkasan harian</td>
+</tr>
+<tr>
+<td><code>MasterDataHelper.gs</code></td>
+<td>CRUD cabang, karyawan, part, users</td>
+</tr>
+<tr>
+<td><code>PembelianHelper.gs</code></td>
+<td>Pembelian part, hutang supplier</td>
+</tr>
+<tr>
+<td><code>TransferHelper.gs</code></td>
+<td>Transfer stok antar cabang</td>
+</tr>
+<tr>
+<td><code>RoleHelper.gs</code></td>
+<td>Validasi hak akses per role</td>
+</tr>
+<tr>
+<td><code>AutoHelper.gs</code></td>
+<td>Fungsi otomatis (trigger harian)</td>
+</tr>
+<tr>
+<td><code>Setup.gs</code></td>
+<td>Inisialisasi sheet pertama kali</td>
+</tr>
+<tr>
+<td><code>ResetHelper.gs</code></td>
+<td>Reset/backup data</td>
+</tr>
+</tbody>
+</table>
+<h3>Frontend (.html)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Halaman</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WebApp.html</code></td>
+<td>Shell utama: sidebar, top bar, routing</td>
+</tr>
+<tr>
+<td><code>Styles.html</code></td>
+<td>CSS global (dark theme, glassmorphism)</td>
+</tr>
+<tr>
+<td><code>Scripts.html</code></td>
+<td>JS utilities: API, Session, Toast, formatRupiah</td>
+</tr>
+<tr>
+<td><code>Dashboard.html</code></td>
+<td>Dashboard utama</td>
+</tr>
+<tr>
+<td><code>ServiceForm.html</code></td>
+<td>Form input transaksi baru</td>
+</tr>
+<tr>
+<td><code>StatusForm.html</code></td>
+<td>Update status &amp; edit transaksi</td>
+</tr>
+<tr>
+<td><code>KasirForm.html</code></td>
+<td>Manajemen kasir harian</td>
+</tr>
+<tr>
+<td><code>PembelianForm.html</code></td>
+<td>Form pembelian part</td>
+</tr>
+<tr>
+<td><code>ReturnForm.html</code></td>
+<td>Form return supplier</td>
+</tr>
+<tr>
+<td><code>TransferForm.html</code></td>
+<td>Form transfer cabang</td>
+</tr>
+<tr>
+<td><code>MasterData.html</code></td>
+<td>CRUD master data</td>
+</tr>
+<tr>
+<td><code>LaporanKas.html</code></td>
+<td>Laporan kas harian</td>
+</tr>
+<tr>
+<td><code>LaporanStok.html</code></td>
+<td>Laporan inventori stok</td>
+</tr>
+<tr>
+<td><code>LaporanLengkap.html</code></td>
+<td>Laporan komprehensif</td>
+</tr>
+<tr>
+<td><code>LaporanLabaRugi.html</code></td>
+<td>Laporan laba rugi</td>
+</tr>
+<tr>
+<td><code>LaporanServisan.html</code></td>
+<td>Laporan detail servisan</td>
+</tr>
+<tr>
+<td><code>RingkasanHarian.html</code></td>
+<td>Ringkasan tutup toko</td>
+</tr>
+<tr>
+<td><code>RiwayatPart.html</code></td>
+<td>Riwayat pergerakan stok</td>
+</tr>
+<tr>
+<td><code>StockOpname.html</code></td>
+<td>Stock opname</td>
+</tr>
+<tr>
+<td><code>ImportStok.html</code></td>
+<td>Import stok batch CSV</td>
+</tr>
+<tr>
+<td><code>PenjualanForm.html</code></td>
+<td>Penjualan aksesoris</td>
+</tr>
+<tr>
+<td><code>BatalTransaksi.html</code></td>
+<td>Void transaksi</td>
+</tr>
+<tr>
+<td><code>NotaHelper.html</code></td>
+<td>Template cetak nota</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🔐 SISTEM KEAMANAN</h2>
+<table>
+<thead>
+<tr>
+<th>Fitur</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Autentikasi</td>
+<td>Username + password (hash) di sheet USERS</td>
+</tr>
+<tr>
+<td>Sesi</td>
+<td>localStorage browser (Session object)</td>
+</tr>
+<tr>
+<td>RBAC</td>
+<td>Role check di setiap fungsi backend</td>
+</tr>
+<tr>
+<td>Concurrency</td>
+<td>LockService.getScriptLock() mencegah data ganda</td>
+</tr>
+<tr>
+<td>Audit Trail</td>
+<td>Setiap aksi user tercatat di ACTIVITY_LOG</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>📊 PETA FITUR PER ROLE</h2>
+<table>
+<thead>
+<tr>
+<th>Fitur</th>
+<th style="text-align: center;">OWNER</th>
+<th style="text-align: center;">ADMIN</th>
+<th style="text-align: center;">TEKNISI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dashboard</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Transaksi Baru</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Update Status</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Edit Transaksi</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Hapus/Void</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Penjualan Aksesoris</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Pembelian Part</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Return Supplier</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Transfer Cabang</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Master Data</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Manajemen Kasir</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Laporan Kas</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Laporan Stok</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Stock Opname</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Laporan Lengkap</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Laporan Laba Rugi</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Laporan Servisan</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Ringkasan Tutup Toko</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Riwayat Part</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Import Stok</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Pembatalan/Void Menu</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Lihat Semua Cabang</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+</tbody>
+</table>
+<hr /></body></html>

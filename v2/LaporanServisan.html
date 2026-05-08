@@ -1,0 +1,281 @@
+<!-- LaporanServisan.html — Laporan Detail Servisan Per Cabang -->
+<script>
+let lsData = [];
+let lsPage = 1;
+const LS_PER_PAGE = 30;
+
+async function loadLaporanServisan() {
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">🔧 Laporan Servisan</h1>
+        <p class="page-subtitle">Daftar lengkap servisan masuk, status, part, modal, laba — per cabang & global</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="exportToCSV('lsTable','Laporan_Servisan')">📥 Export CSV</button>
+        <button class="btn btn-outline" onclick="refreshLaporanServisan()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      ${!Session.isCabangLocked() ? `
+        <div class="form-group"><label class="form-label">Cabang</label>
+          <select class="form-control" id="lsCab">
+            <option value="">Semua Cabang</option>
+          </select>
+        </div>` : ''}
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-control" id="lsStatus">
+          <option value="">Semua Status</option>
+          <option value="ANTRI">⏳ Antri</option>
+          <option value="PROSES">🔄 Proses</option>
+          <option value="SEDANG_PROSES">🔧 Sedang Proses</option>
+          <option value="SELESAI_BELUM_DIAMBIL">✅ Selesai Belum Diambil</option>
+          <option value="SELESAI_BELUM_LUNAS">💳 Selesai Belum Lunas</option>
+          <option value="SELESAI_DIAMBIL">✅ Sudah Diambil</option>
+          <option value="BATAL">❌ Batal</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Dari Tanggal</label>
+        <input type="date" class="form-control" id="lsStart" value="${getMonthStartStr()}">
+      </div>
+      <div class="form-group"><label class="form-label">Sampai Tanggal</label>
+        <input type="date" class="form-control" id="lsEnd" value="${getTodayStr()}">
+      </div>
+      <div class="form-group"><label class="form-label">Cari</label>
+        <input type="text" class="form-control" id="lsSearch" placeholder="🔍 Nama / ID / HP...">
+      </div>
+      <div class="form-group" style="align-self:flex-end">
+        <button class="btn btn-primary" onclick="refreshLaporanServisan()">🔍 Tampilkan</button>
+      </div>
+    </div>
+
+    <!-- KPI Summary -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)" id="lsKpiGrid">
+      <div class="kpi-card"><div class="kpi-label">Total Masuk</div><div class="kpi-value" id="lsKpiTotal">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Selesai</div><div class="kpi-value" id="lsKpiSelesai" style="color:var(--accent-emerald)">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Proses</div><div class="kpi-value" id="lsKpiProses" style="color:var(--accent-amber)">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Batal</div><div class="kpi-value" id="lsKpiBatal" style="color:var(--accent-red)">-</div></div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-top:12px" id="lsKpiGrid2">
+      <div class="kpi-card"><div class="kpi-label">Total Pendapatan</div><div class="kpi-value" id="lsKpiPendapatan" style="color:var(--accent-emerald)">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Modal Part</div><div class="kpi-value" id="lsKpiModal" style="color:var(--accent-red)">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Laba Kotor</div><div class="kpi-value" id="lsKpiLabaKotor">-</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Laba Bersih</div><div class="kpi-value" id="lsKpiLabaBersih" style="color:var(--accent-cyan)">-</div></div>
+    </div>
+
+    <!-- Status Breakdown per Cabang -->
+    <div class="card" style="margin-top:20px" id="lsStatusCard">
+      <div class="card-header"><h3 class="card-title">📊 Breakdown Status per Cabang</h3></div>
+      <div id="lsStatusBreakdown" style="padding:20px;text-align:center;color:var(--text-muted)">Memuat...</div>
+    </div>
+
+    <!-- Tabel Detail Servisan -->
+    <div class="card" style="margin-top:20px">
+      <div class="card-header">
+        <h3 class="card-title">📋 Daftar Servisan Detail</h3>
+        <span id="lsCount" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+      <div id="lsTableWrapper">
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">Klik <strong>🔍 Tampilkan</strong> untuk memuat data</div>
+      </div>
+      <div id="lsPagination" style="padding:16px;display:flex;justify-content:center;gap:8px"></div>
+    </div>`;
+
+  // Load cabang dropdown
+  if (!Session.isCabangLocked()) {
+    try {
+      const cl = await API.call('getCabangList');
+      const sel = document.getElementById('lsCab');
+      if (sel && cl) {
+        cl.forEach(c => {
+          const o = document.createElement('option');
+          o.value = c.id;
+          o.textContent = c.id + (c.nama ? ' — ' + c.nama : '');
+          sel.appendChild(o);
+        });
+        const sv = Session.getActiveViewCabang();
+        if (sv && sv !== 'SEMUA') sel.value = sv;
+      }
+    } catch(e) {}
+  }
+
+  refreshLaporanServisan();
+}
+
+async function refreshLaporanServisan() {
+  const cabSel    = document.getElementById('lsCab');
+  const statusSel = document.getElementById('lsStatus');
+  const startEl   = document.getElementById('lsStart');
+  const endEl     = document.getElementById('lsEnd');
+  const searchEl  = document.getElementById('lsSearch');
+  const wrapper   = document.getElementById('lsTableWrapper');
+  const breakdown = document.getElementById('lsStatusBreakdown');
+
+  let cab = Session.isCabangLocked() ? Session.getCabang() : (cabSel?.value || '');
+  if (cab && cab !== 'SEMUA') Session.setActiveViewCabang(cab);
+  if (typeof updateBranchStyle === 'function') updateBranchStyle(cab || 'SEMUA');
+
+  if (wrapper) wrapper.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="width:30px;height:30px;border-width:3px;display:inline-block"></div><p style="margin-top:12px;color:var(--text-muted)">Memuat data servisan...</p></div>';
+  if (breakdown) breakdown.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Memuat...</div>';
+
+  try {
+    const result = await API.call('getLaporanServisan', cab === 'SEMUA' ? '' : cab, {
+      startDate:  startEl?.value || '',
+      endDate:    endEl?.value || '',
+      status:     statusSel?.value || '',
+      search:     searchEl?.value || ''
+    });
+
+    if (!result) throw new Error('Data kosong dari server');
+
+    lsData = result.list || [];
+    const summary = result.summary || {};
+    const byStatus = result.byStatus || {};
+    const byCabang = result.byCabang || {};
+    lsPage = 1;
+
+    // Update KPI
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('lsKpiTotal',      (summary.total || 0).toLocaleString('id-ID') + ' unit');
+    set('lsKpiSelesai',    (summary.selesai || 0).toLocaleString('id-ID') + ' unit');
+    set('lsKpiProses',     (summary.proses || 0).toLocaleString('id-ID') + ' unit');
+    set('lsKpiBatal',      (summary.batal || 0).toLocaleString('id-ID') + ' unit');
+    set('lsKpiPendapatan', formatRupiah(summary.totalPendapatan || 0));
+    set('lsKpiModal',      formatRupiah(summary.totalModal || 0));
+    set('lsKpiLabaKotor',  formatRupiah(summary.totalLabaKotor || 0));
+    set('lsKpiLabaBersih', formatRupiah(summary.totalLabaBersih || 0));
+    set('lsCount',         lsData.length + ' transaksi');
+
+    // Render breakdown per cabang
+    renderStatusBreakdown(byCabang);
+    renderLsTable();
+
+  } catch(err) {
+    console.error('[LaporanServisan] error:', err);
+    if (wrapper) wrapper.innerHTML = `<div style="text-align:center;padding:40px">
+      <p style="color:var(--accent-red)">${err.message}</p>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="refreshLaporanServisan()">🔄 Coba Lagi</button>
+    </div>`;
+    Toast.error('Gagal memuat: ' + err.message);
+  }
+}
+
+function renderStatusBreakdown(byCabang) {
+  const el = document.getElementById('lsStatusBreakdown');
+  if (!el) return;
+
+  const cabs = Object.keys(byCabang);
+  if (!cabs.length) { el.innerHTML = '<p style="color:var(--text-muted)">Tidak ada data</p>'; return; }
+
+  const statuses = ['ANTRI','PROSES','SEDANG_PROSES','SELESAI_BELUM_DIAMBIL','SELESAI_BELUM_LUNAS','SELESAI_DIAMBIL','BATAL'];
+  const sLabels  = {'ANTRI':'Antri','PROSES':'Proses','SEDANG_PROSES':'Sdg Proses','SELESAI_BELUM_DIAMBIL':'Selesai','SELESAI_BELUM_LUNAS':'Blm Lunas','SELESAI_DIAMBIL':'Diambil','BATAL':'Batal'};
+  const sColors  = {'ANTRI':'var(--accent-amber)','PROSES':'var(--accent-blue)','SEDANG_PROSES':'var(--accent-cyan)','SELESAI_BELUM_DIAMBIL':'var(--accent-emerald)','SELESAI_BELUM_LUNAS':'var(--accent-red)','SELESAI_DIAMBIL':'var(--accent-emerald)','BATAL':'var(--accent-red)'};
+
+  let html = '<div class="table-container"><table class="data-table"><thead><tr><th>Cabang</th>';
+  statuses.forEach(s => { html += `<th class="text-center" style="color:${sColors[s]}">${sLabels[s]}</th>`; });
+  html += '<th class="text-center">Total</th><th class="text-right">Pendapatan</th><th class="text-right">Laba Bersih</th></tr></thead><tbody>';
+
+  cabs.forEach(cab => {
+    const d = byCabang[cab];
+    html += `<tr><td style="font-weight:700">${cab}</td>`;
+    statuses.forEach(s => {
+      html += `<td class="text-center">${d.statusCount?.[s] || 0}</td>`;
+    });
+    html += `<td class="text-center" style="font-weight:700">${d.total || 0}</td>
+             <td class="text-right" style="color:var(--accent-emerald)">${formatRupiah(d.pendapatan || 0)}</td>
+             <td class="text-right" style="color:var(--accent-cyan)">${formatRupiah(d.labaBersih || 0)}</td></tr>`;
+  });
+
+  // Footer total jika multi cabang
+  if (cabs.length > 1) {
+    html += '<tr style="background:rgba(255,255,255,0.07);font-weight:700"><td>TOTAL</td>';
+    statuses.forEach(s => {
+      const tot = cabs.reduce((acc, c) => acc + (byCabang[c].statusCount?.[s] || 0), 0);
+      html += `<td class="text-center">${tot}</td>`;
+    });
+    const tTot = cabs.reduce((acc, c) => acc + (byCabang[c].total || 0), 0);
+    const tPend = cabs.reduce((acc, c) => acc + (byCabang[c].pendapatan || 0), 0);
+    const tLaba = cabs.reduce((acc, c) => acc + (byCabang[c].labaBersih || 0), 0);
+    html += `<td class="text-center">${tTot}</td><td class="text-right">${formatRupiah(tPend)}</td><td class="text-right">${formatRupiah(tLaba)}</td></tr>`;
+  }
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function renderLsTable() {
+  const wrapper = document.getElementById('lsTableWrapper');
+  const paging  = document.getElementById('lsPagination');
+  const countEl = document.getElementById('lsCount');
+  if (!wrapper) return;
+
+  if (!lsData.length) {
+    wrapper.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Tidak ada data servisan untuk filter yang dipilih.</div>';
+    if (paging) paging.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(lsData.length / LS_PER_PAGE);
+  const sliced = lsData.slice((lsPage - 1) * LS_PER_PAGE, lsPage * LS_PER_PAGE);
+  if (countEl) countEl.textContent = `${lsData.length} transaksi (hal. ${lsPage}/${totalPages})`;
+
+  const sColors = {
+    'ANTRI':'var(--accent-amber)','PROSES':'var(--accent-blue)','SEDANG_PROSES':'var(--accent-cyan)',
+    'SELESAI_BELUM_DIAMBIL':'var(--accent-emerald)','SELESAI_BELUM_LUNAS':'var(--accent-red)',
+    'SELESAI_DIAMBIL':'var(--accent-emerald)','BATAL':'var(--accent-red)'
+  };
+
+  let html = `<div class="table-container"><table class="data-table" id="lsTable">
+    <thead><tr>
+      <th>ID</th><th>Tgl Masuk</th><th>Cabang</th><th>Pelanggan</th><th>Tipe HP</th>
+      <th>Kerusakan</th><th>Teknisi</th><th>Part</th><th>Metode</th>
+      <th class="text-right">H.Jual Part</th><th class="text-right">Ongkos</th>
+      <th class="text-right">Modal</th><th class="text-right">Laba Kotor</th>
+      <th class="text-right">Komisi</th><th class="text-right">Laba Bersih</th>
+      <th>Status</th>
+    </tr></thead><tbody>`;
+
+  sliced.forEach(r => {
+    const sc = sColors[r.STATUS] || 'inherit';
+    const pendapatan = (Number(r.HARGA_JUAL) || 0) + (Number(r.ONGKOS_KERJA) || 0);
+    html += `<tr style="${r.STATUS==='BATAL'?'opacity:0.5':''}" onclick="goToStatus('${r.ID_TRANSAKSI}')" title="Klik untuk lihat detail">
+      <td style="font-size:11px;color:var(--primary);cursor:pointer">${r.ID_TRANSAKSI}</td>
+      <td style="font-size:12px">${String(r.TGL_MASUK||'').substring(0,10)}</td>
+      <td><span class="badge" style="background:rgba(99,102,241,0.2)">${r.CABANG||'-'}</span></td>
+      <td style="font-weight:500">${r.NAMA_PELANGGAN||'-'}</td>
+      <td style="font-size:12px">${r.TIPE_HP||'-'}</td>
+      <td style="font-size:12px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.KERUSAKAN||''}">${r.KERUSAKAN||'-'}</td>
+      <td style="font-size:12px">${r.TEKNISI||'-'}</td>
+      <td style="font-size:11px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.NAMA_PART||''}">${r.NAMA_PART||'-'}</td>
+      <td><span style="font-size:11px">${r.METODE_BAYAR||'-'}</span></td>
+      <td class="text-right">${formatRupiah(Number(r.HARGA_JUAL)||0)}</td>
+      <td class="text-right">${formatRupiah(Number(r.ONGKOS_KERJA)||0)}</td>
+      <td class="text-right" style="color:var(--accent-red)">${formatRupiah(Number(r.TOTAL_MODAL)||0)}</td>
+      <td class="text-right">${formatRupiah(Number(r.LABA_KOTOR)||0)}</td>
+      <td class="text-right" style="color:var(--accent-amber)">${formatRupiah(Number(r.KOMISI)||0)}</td>
+      <td class="text-right" style="font-weight:700;color:${Number(r.LABA_BERSIH)>=0?'var(--accent-cyan)':'var(--accent-red)'}">${formatRupiah(Number(r.LABA_BERSIH)||0)}</td>
+      <td><span style="color:${sc};font-size:11px;font-weight:600">${r.STATUS||'-'}</span></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  wrapper.innerHTML = html;
+
+  // Pagination
+  if (paging) {
+    let pHtml = '';
+    if (lsPage > 1) pHtml += `<button class="btn btn-sm btn-outline" onclick="lsChangePage(${lsPage-1})">‹ Prev</button>`;
+    const start = Math.max(1, lsPage - 2), end = Math.min(totalPages, lsPage + 2);
+    for (let i = start; i <= end; i++) {
+      pHtml += `<button class="btn btn-sm ${i===lsPage?'btn-primary':'btn-outline'}" onclick="lsChangePage(${i})">${i}</button>`;
+    }
+    if (lsPage < totalPages) pHtml += `<button class="btn btn-sm btn-outline" onclick="lsChangePage(${lsPage+1})">Next ›</button>`;
+    paging.innerHTML = pHtml;
+  }
+}
+
+function lsChangePage(p) { lsPage = p; renderLsTable(); window.scrollTo(0, 0); }
+</script>

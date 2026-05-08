@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Changelog & Release Notes ServicePro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 40px; background-color: #f9f9fa; }
+        .container { background-color: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { color: #2c3e50; text-align: center; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 40px; }
+        .version-box { margin-bottom: 50px; border-left: 4px solid #3498db; padding-left: 20px; }
+        h2 { color: #2980b9; margin-top: 0; display: flex; align-items: center; }
+        h2 span.badge { background-color: #e74c3c; color: white; font-size: 14px; padding: 4px 10px; border-radius: 20px; margin-left: 15px; }
+        h3 { color: #16a085; margin-top: 25px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        p.desc { color: #7f8c8d; font-style: italic; margin-bottom: 20px; }
+        .feature-item { margin-bottom: 20px; }
+        .feature-title { font-weight: bold; color: #2c3e50; }
+        .feature-detail { margin-top: 5px; margin-left: 20px; }
+        .bug-fix { color: #e67e22; }
+        .new-feature { color: #27ae60; }
+        .security { color: #c0392b; }
+        
+        @media print {
+            body { padding: 0; background-color: white; }
+            .container { box-shadow: none; padding: 0; }
+            .version-box { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 CHANGELOG & RELEASE NOTES<br><small style="font-size: 20px; color: #7f8c8d;">ServicePro HP (Riwayat Perjalanan Aplikasi)</small></h1>
+        
+        <div class="version-box">
+            <h2>Versi 5.1 (Terbaru) <span class="badge">Current</span></h2>
+            <p class="desc">Penyempurnaan Keamanan, Multi-Item Transfer, dan Estetika UI.</p>
+            
+            <div class="feature-item">
+                <div class="feature-title"><span class="security">[KEAMANAN]</span> Hak Akses Spesifik (Admin No Edit)</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Owner khawatir admin kasir sembarangan mengedit harga part atau membatalkan transaksi yang sudah terjadi.<br>
+                    <b>Solusi:</b> Diciptakan Role baru bernama <code>Admin (Hanya Input)</code>. <br>
+                    <b>Hasil:</b> Karyawan dengan role ini kini tidak bisa melihat Dashboard, tidak bisa melihat Laba Rugi, dan kehilangan tombol "Edit Transaksi" serta "Hapus/Void". Mereka hanya berfungsi sebagai mesin pencatat transaksi murni.
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR BARU]</span> Transfer Cabang Massal & Gudang Pusat</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Mentransfer barang dari satu cabang ke cabang lain sangat melelahkan karena harus menginput satu per satu.<br>
+                    <b>Solusi:</b> Form Transfer Cabang dirombak menjadi sistem "Keranjang (Cart)".<br>
+                    <b>Hasil:</b> Kini admin bisa memasukkan puluhan barang ke dalam daftar keranjang, memeriksa ulang, mengedit/menghapus barang yang salah klik, lalu menekan tombol "Simpan Sekaligus". Selain itu, konsep "Cabang Gudang" diresmikan agar owner bisa mendistribusikan barang kulakan dengan mudah.
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[UI/UX]</span> Efek Glowing Logo Cabang & Watermark</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Tampilan terasa kaku dan logo watermark belakang mengganggu tulisan.<br>
+                    <b>Solusi:</b> Penambahan CSS canggih (Mix-blend-mode & Drop-shadow).<br>
+                    <b>Hasil:</b> Logo tiap cabang kini memancarkan cahaya (glowing) sesuai warna identitasnya (SIB = Biru, BL = Ungu, dst). Watermark latar belakang dibuat redup namun tetap premium tanpa menghalangi tabel data.
+                </div>
+            </div>
+        </div>
+
+        <div class="version-box">
+            <h2>Versi 5.0</h2>
+            <p class="desc">Otomatisasi Pembukuan & Laporan Akuntansi Kelas Enterprise.</p>
+            
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR BARU]</span> Ringkasan Tutup Toko (Fitur Emas Owner)</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Owner pusing menghitung "uang di laci ini harus dibagi ke siapa saja?" setiap malam.<br>
+                    <b>Solusi:</b> Dibuatkan kalkulator canggih di menu Tutup Toko.<br>
+                    <b>Hasil:</b> Sistem membedah uang laci menjadi: Uang Part (yang harus disetor ke supplier), Uang Jasa (untuk gaji teknisi), dan Laba Bersih Toko. Semua terpisahkan secara fisik!
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-title"><span class="bug-fix">[PERBAIKAN]</span> Bug Cetak Nota Kosong & Cetak Stock Opname</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Kadang saat diklik cetak nota, datanya tidak muncul karena internet lambat / Google Sheets belum selesai menyimpan.<br>
+                    <b>Solusi:</b> Penambahan fungsi <code>SpreadsheetApp.flush()</code>.<br>
+                    <b>Hasil:</b> Sistem dipaksa mengunci data di server sebelum memunculkan layar cetak nota. Bug nota kosong musnah 100%.
+                </div>
+            </div>
+            
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR BARU]</span> Laporan Laba Rugi Real & OPEX</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Laba bersih sebelumnya tidak mencerminkan pengeluaran operasional toko seperti bayar listrik, beli spidol, konsumsi.<br>
+                    <b>Solusi:</b> Penambahan tombol "Input Pengeluaran" di menu Kasir/Kas Harian.<br>
+                    <b>Hasil:</b> Pengeluaran harian ini akan otomatis memotong angka Laba Bersih di laporan, sehingga Owner melihat <i>Nett Profit</i> yang sebenarnya.
+                </div>
+            </div>
+        </div>
+
+        <div class="version-box">
+            <h2>Versi 4.0</h2>
+            <p class="desc">Transisi menjadi Sistem Multi-Cabang Penuh.</p>
+            
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR BARU]</span> Filter Cabang Global & Master Data</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Data dari 4 cabang (SIB, BL, LJ, AF) bercampur aduk.<br>
+                    <b>Solusi:</b> Dibuatkan arsitektur <i>Multi-Tenant</i> pada Database Google Sheets.<br>
+                    <b>Hasil:</b> Setiap laporan, kas harian, dan dashboard memiliki tombol filter cabang. Bahkan, jika kasir login, ia akan otomatis "Terkunci" hanya pada cabangnya sendiri, sementara Owner bisa melihat tombol "SEMUA CABANG".
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR BARU]</span> Sistem Piutang (BON) & Pelunasan</div>
+                <div class="feature-detail">
+                    <b>Masalah:</b> Pelanggan yang belum lunas tidak tercatat rapi di kas.<br>
+                    <b>Solusi:</b> Penambahan metode bayar "BON" pada saat servis selesai.<br>
+                    <b>Hasil:</b> Uang tidak akan masuk ke kas. Namun begitu pelanggan datang melunasi, tombol "Lunasi BON" akan memunculkan pilihan Cash/Transfer, dan uang seketika masuk ke Kas Harian detik itu juga.
+                </div>
+            </div>
+        </div>
+
+        <div class="version-box">
+            <h2>Versi 3.0 & Ke Bawah</h2>
+            <p class="desc">Fondasi Awal ServicePro HP.</p>
+            
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR DASAR]</span> Penerimaan Servis & Status Tracking</div>
+                <div class="feature-detail">
+                    <b>Hasil:</b> Diciptakannya alur kehidupan servis HP: Antri -> Proses -> Selesai -> Diambil. Setiap perpindahan status mencatat timestamp (waktu) yang akurat.
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-title"><span class="new-feature">[FITUR DASAR]</span> Manajemen Inventori (Stok Part)</div>
+                <div class="feature-detail">
+                    <b>Hasil:</b> Sistem memotong stok secara otomatis ketika Teknisi/Admin menggunakan part pada form Update Status, dan mencatat pergerakannya ke dalam Riwayat Part.
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 50px; color: #95a5a6; border-top: 1px solid #eee; padding-top: 20px;">
+            <p>Dihasilkan secara otomatis oleh Antigravity AI - ServicePro HP System</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!-- ImportStok.html — CSV Batch Import -->
+<script>
+async function loadImportStok() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">📥 Import Stok Batch</h1><p class="page-subtitle">Import stok dari file CSV</p></div>
+      <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+    </div>
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:16px">📄 Format CSV</h3>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px">File CSV harus memiliki kolom berikut (gunakan nama header persis seperti ini):</p>
+      <div style="background:var(--bg-glass);padding:12px;border-radius:8px;font-family:monospace;font-size:13px;color:var(--accent-cyan);margin-bottom:8px">
+        tanggal,nama,jenis,kategori,merk,supplier,stok,hargaBeli,hargaJual
+      </div>
+      <div style="background:var(--bg-glass);padding:10px 12px;border-radius:8px;font-size:12px;color:var(--text-muted);margin-bottom:16px">
+        📌 <b style="color:var(--text-secondary)">Keterangan kolom:</b><br>
+        • <b>tanggal</b>: format YYYY-MM-DD (mis. 2024-05-20)<br>
+        • <b>nama</b>: nama part/barang<br>
+        • <b>jenis</b>: SPAREPART / TOOL / ACCESSORIES<br>
+        • <b>kategori</b>: sub-kategori (mis. LCD, BATERAI, CASING)<br>
+        • <b>merk</b>: merk barang (mis. OEM, Compatible, Original)<br>
+        • <b>supplier</b>: nama supplier<br>
+        • <b>stok</b>: jumlah stok awal<br>
+        • <b>hargaBeli</b>: harga beli (angka, tanpa titik/koma)<br>
+        • <b>hargaJual</b>: harga jual (angka, tanpa titik/koma)
+      </div>
+      <p style="color:var(--text-muted);font-size:12px">Contoh isi CSV:</p>
+      <div style="background:var(--bg-glass);padding:12px;border-radius:8px;font-family:monospace;font-size:12px;color:var(--text-secondary)">
+        2024-05-20,LCD iPhone 13,SPAREPART,LCD,OEM,TokoSupplier,10,150000,350000<br>
+        2025-01-15,Baterai Samsung A54,SPAREPART,BATERAI,Compatible,SupplierB,20,50000,120000
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:16px">📤 Upload File</h3>
+      ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label required">Cabang Tujuan</label>
+        <select class="form-control" id="importCabang"></select></div>`:''}
+      <div class="form-group">
+        <label class="form-label required">File CSV</label>
+        <input type="file" id="importFile" accept=".csv" class="form-control" onchange="previewCSV()">
+      </div>
+      <div id="importPreview" style="display:none">
+        <h4 style="margin:16px 0 8px;font-size:14px">Preview Data:</h4>
+        <div class="table-container" id="importPreviewTable"></div>
+        <p id="importCount" style="margin-top:8px;font-size:13px;color:var(--text-muted)"></p>
+        <button class="btn btn-primary btn-lg" style="margin-top:16px" onclick="submitImport()">📥 Import Data</button>
+      </div>
+    </div>
+    <div id="importResult" style="display:none" class="card">
+      <h3 class="card-title" style="margin-bottom:12px">📊 Hasil Import</h3>
+      <div id="importResultContent"></div>
+    </div>`;
+
+  if(!Session.isCabangLocked()){try{const cl=await API.call('getCabangList');const sel=document.getElementById('importCabang');
+    cl.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.id+' - '+c.nama;sel.appendChild(o);});}catch(e){}}
+}
+
+let csvParsedData = [];
+
+function previewCSV() {
+  const file = document.getElementById('importFile').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) { Toast.warning('File CSV kosong atau hanya header'); return; }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    csvParsedData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(',');
+      if (vals.length < 2) continue;
+      const row = {};
+      headers.forEach((h, j) => { row[h] = vals[j] ? vals[j].trim() : ''; });
+      csvParsedData.push(row);
+    }
+
+    const el = document.getElementById('importPreviewTable');
+    let html = '<table class="data-table"><thead><tr><th>#</th>';
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += '</tr></thead><tbody>';
+    csvParsedData.slice(0, 10).forEach((r, i) => {
+      html += `<tr><td>${i+1}</td>`;
+      headers.forEach(h => html += `<td>${r[h]||''}</td>`);
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    if (csvParsedData.length > 10) html += `<p style="color:var(--text-muted);font-size:12px;margin-top:8px">...dan ${csvParsedData.length-10} baris lainnya</p>`;
+    el.innerHTML = html;
+
+    document.getElementById('importCount').textContent = `Total: ${csvParsedData.length} item siap di-import`;
+    document.getElementById('importPreview').style.display = 'block';
+  };
+  reader.readAsText(file);
+}
+
+async function submitImport() {
+  if (!csvParsedData.length) { Toast.warning('Tidak ada data'); return; }
+  const cab = Session.isCabangLocked() ? Session.getCabang() : document.getElementById('importCabang')?.value;
+  if (!cab) { Toast.warning('Pilih cabang'); return; }
+
+  Loading.show('Mengimport ' + csvParsedData.length + ' item...');
+  try {
+    const result = await API.call('importBatch', csvParsedData, cab, Session.getUsername());
+    const resEl = document.getElementById('importResultContent');
+    if (result.success) {
+      Toast.success(result.message);
+      resEl.innerHTML = `<p style="color:var(--accent-emerald);font-weight:600">✅ ${result.message}</p>`;
+      if (result.errors && result.errors.length > 0) {
+        resEl.innerHTML += '<h4 style="margin-top:12px;color:var(--accent-amber)">⚠️ Peringatan:</h4><ul style="color:var(--text-muted);font-size:13px">' +
+          result.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+      }
+    } else {
+      resEl.innerHTML = `<p style="color:var(--accent-red)">❌ ${result.message}</p>`;
+    }
+    document.getElementById('importResult').style.display = 'block';
+  } catch(e) { Toast.error('Error: '+e.message); }
+  Loading.hide();
+}
+</script>

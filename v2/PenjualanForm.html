@@ -1,0 +1,346 @@
+<!-- PenjualanForm.html — Direct Sales UI -->
+<script>
+let penjualanStokData = [];
+
+async function loadPenjualanPart() {
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div id="penjualanFormContainer">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">🛒 Penjualan Part & Aksesoris</h1>
+          <p class="page-subtitle">Penjualan langsung tanpa servis</p>
+        </div>
+      </div>
+
+      <!-- Data Pelanggan -->
+      <div class="card" style="position: relative; z-index: 50; overflow: visible;">
+        <div class="card-header">
+          <h3 class="card-title">👤 Data Pelanggan</h3>
+        </div>
+        <div style="display:flex; gap:15px; flex-wrap:wrap">
+          ${!Session.isCabangLocked() ? `
+          <div class="form-group" style="flex:1; min-width:200px">
+            <label class="form-label required">Cabang Transaksi</label>
+            <select id="pnjCabang" class="form-control" required></select>
+          </div>` : `<input type="hidden" id="pnjCabang" value="${Session.getCabang()}">`}
+          
+          <div class="form-group autocomplete-wrapper" style="flex:2; min-width:250px">
+            <label class="form-label required">Nama Pelanggan</label>
+            <input type="text" id="pnjNamaPelanggan" class="form-control" placeholder="Ketik nama pelanggan..." required autocomplete="off">
+            <div class="autocomplete-list" id="pnjNamaList"></div>
+          </div>
+          <div class="form-group" style="flex:1; min-width:200px">
+            <label class="form-label">No. WhatsApp</label>
+            <input type="tel" id="pnjTelepon" class="form-control" placeholder="08xx...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Item Penjualan -->
+      <div class="card" style="position: relative; z-index: 40;">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <h3 class="card-title">🛒 Item Penjualan</h3>
+          <button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px" onclick="addPnjPartRow()">+ Tambah Item</button>
+        </div>
+        <div class="table-container" style="overflow:visible; min-height:300px;">
+          <table class="part-table" id="pnjPartTable">
+            <thead>
+              <tr>
+                <th width="40%">NAMA BARANG</th>
+                <th width="10%">QTY</th>
+                <th width="15%" class="text-right">HARGA (Rp)</th>
+                <th width="20%" class="text-right">TOTAL (Rp)</th>
+                <th width="5%"></th>
+              </tr>
+            </thead>
+            <tbody id="pnjPartBody"></tbody>
+          </table>
+        </div>
+        <div style="padding:20px; background:var(--bg-secondary); border-top:1px solid var(--border-glass); border-radius:0 0 var(--radius-lg) var(--radius-lg); display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-secondary); font-size:14px;">Grand Total</span>
+          <span id="pnjGrandTotal" style="font-size:24px; font-weight:700; color:var(--text-primary);">Rp 0</span>
+        </div>
+      </div>
+
+      <!-- Pembayaran & Simpan -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">💳 Pembayaran</h3>
+        </div>
+        <div style="display:flex; gap:15px; flex-wrap:wrap">
+          <div class="form-group" style="flex:1; min-width:200px">
+            <label class="form-label required">Metode Pembayaran</label>
+            <select id="pnjMetodeBayar" class="form-control" required>
+              <option value="CASH">CASH (Tunai)</option>
+              <option value="TRANSFER">TRANSFER (BCA/Mandiri/QRIS)</option>
+              <option value="BON">BON (Hutang)</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:2; min-width:300px">
+            <label class="form-label">Catatan (Opsional)</label>
+            <input type="text" id="pnjCatatan" class="form-control" placeholder="Contoh: Garansi 3 hari">
+          </div>
+        </div>
+        
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-outline" style="padding:12px 30px;font-size:16px" onclick="loadPenjualanPart()">Batal</button>
+          <button type="button" class="btn btn-primary" id="btnSubmitPnj" onclick="handlePenjualanSubmit()" style="padding:12px 30px;font-size:16px">💾 Simpan Penjualan</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Autocomplete Pelanggan
+  setupAutocomplete('pnjNamaPelanggan', 'pnjNamaList', q => API.call('autocompletePelanggan', q, 10), item => {
+    document.getElementById('pnjNamaPelanggan').value = item.nama;
+    document.getElementById('pnjTelepon').value = item.telepon || '';
+  });
+
+  const cabSel = document.getElementById('pnjCabang');
+  if (cabSel && cabSel.tagName === 'SELECT') {
+    try {
+      const list = await API.call('getCabangList');
+      list.forEach(c => cabSel.innerHTML += `<option value="${c.id}">${c.nama}</option>`);
+      
+      // Load stok for initial selection
+      loadPnjStok(cabSel.value);
+      
+      cabSel.addEventListener('change', (e) => {
+        loadPnjStok(e.target.value);
+        // Reset rows because branch changed
+        document.getElementById('pnjPartBody').innerHTML = '';
+        addPnjPartRow();
+        calcPnjGrandTotal();
+      });
+    } catch(e){}
+  } else {
+    loadPnjStok(document.getElementById('pnjCabang').value);
+  }
+
+  addPnjPartRow();
+}
+
+async function loadPnjStok(cabang) {
+  try {
+    const st = await API.call('getStokByCabang', cabang);
+    penjualanStokData = st.filter(r => Number(r.stok || 0) > 0);
+  } catch(e) {
+    penjualanStokData = [];
+  }
+}
+
+let pnjRowIdx = 0;
+function addPnjPartRow() {
+  pnjRowIdx++;
+  const rid = pnjRowIdx;
+  const tr = document.createElement('tr');
+  tr.id = 'pnjRow_' + rid;
+  tr.innerHTML = `
+    <td>
+      <div class="autocomplete-wrapper" style="margin:0">
+        <input type="text" class="pNama" placeholder="🔍 Ketik nama part..." onfocus="showPnjAC(${rid})" oninput="showPnjAC(${rid})">
+        <div class="autocomplete-list" id="pnjAC_${rid}"></div>
+      </div>
+    </td>
+    <td><input type="number" class="pQty" min="1" value="1" oninput="calcPnjRow(${rid})"></td>
+    <td><input type="text" class="pHJ" value="0" oninput="formatRupiahInputEvent(this); calcPnjRow(${rid})"></td>
+    <td class="text-right" style="font-weight:600; font-size:16px; padding-top:14px"><span class="pTotal">0</span></td>
+    <td class="text-center">
+      <button type="button" class="btn btn-icon" style="color:var(--accent-red);background:rgba(239,68,68,0.1)" onclick="document.getElementById('pnjRow_${rid}').remove(); calcPnjGrandTotal()">✕</button>
+      <input type="hidden" class="pHB" value="0">
+      <input type="hidden" class="pSubKategori" value="">
+      <input type="hidden" class="pMerkBarang" value="">
+      <input type="hidden" class="pSupplier" value="">
+      <input type="hidden" class="pJenis" value="">
+    </td>
+  `;
+  document.getElementById('pnjPartBody').appendChild(tr);
+}
+
+function showPnjAC(rid) {
+  const tr = document.getElementById('pnjRow_'+rid);
+  if(!tr) return;
+  const input = tr.querySelector('.pNama');
+  if(!input) return;
+
+  // Portal fix: gunakan div fixed yang ditempel ke body
+  const portalId = 'pnjAC_portal_'+rid;
+  let portal = document.getElementById(portalId);
+  if(!portal) {
+    portal = document.createElement('div');
+    portal.id = portalId;
+    portal.className = 'autocomplete-list';
+    portal.style.cssText = 'position:fixed;z-index:99999;pointer-events:auto;display:none;';
+    document.body.appendChild(portal);
+  }
+
+  function posPortal() {
+    const rect = input.getBoundingClientRect();
+    portal.style.left = rect.left + 'px';
+    portal.style.top = (rect.bottom + 2) + 'px';
+    portal.style.width = Math.max(rect.width, 300) + 'px';
+    portal.style.maxHeight = '280px';
+    portal.style.overflowY = 'auto';
+  }
+
+  const q = input.value.toLowerCase();
+  let matches = penjualanStokData;
+  if(q) matches = matches.filter(r => String(r.nama).toLowerCase().includes(q) || String(r.merkBarang||'').toLowerCase().includes(q));
+  matches = matches.slice(0,25);
+
+  if(matches.length===0){
+    portal.innerHTML='<div class="autocomplete-item" style="color:#94a3b8">Stok Kosong</div>';
+    posPortal(); portal.style.display='block';
+    return;
+  }
+
+  portal.innerHTML = matches.map((r,i) => `
+    <div class="autocomplete-item" data-idx="${i}">
+      <strong>${r.nama}</strong>
+      <div style="color:#94a3b8;font-size:10px;margin-top:2px">
+        ${r.merkBarang||''} | ${r.supplier||''} | Stok: <b style="color:${Number(r.stok)<=3?'#ef4444':'#10b981'}">${r.stok}</b>
+        | Jual: Rp ${formatNumber(r.hargaJual||0)}
+      </div>
+    </div>
+  `).join('');
+
+  portal.querySelectorAll('.autocomplete-item[data-idx]').forEach(el => {
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      const idx = el.getAttribute('data-idx');
+      const data = matches[idx];
+      input.value = data.nama;
+      tr.querySelector('.pHB').value = data.hargaBeli || 0;
+      tr.querySelector('.pHJ').value = formatRupiah(data.hargaJual || 0).replace('Rp ','');
+      tr.querySelector('.pQty').max = data.stok || 0;
+      tr.querySelector('.pSubKategori').value = data.subKategori || '';
+      tr.querySelector('.pMerkBarang').value = data.merkBarang || '';
+      tr.querySelector('.pSupplier').value = data.supplier || '';
+      tr.querySelector('.pJenis').value = data.jenisBarang || '';
+      portal.style.display='none';
+      calcPnjRow(rid);
+    };
+  });
+
+  posPortal(); portal.style.display='block';
+  input.onblur = () => setTimeout(()=>{portal.style.display='none';}, 200);
+}
+
+function calcPnjRow(rid) {
+  const tr = document.getElementById('pnjRow_'+rid);
+  if(!tr) return;
+  const qty = Number(tr.querySelector('.pQty').value) || 0;
+  const maxQty = Number(tr.querySelector('.pQty').max) || Infinity;
+  
+  // Validation stock
+  if (qty > maxQty) {
+    Toast.error('Melebihi stok yang tersedia (' + maxQty + ')');
+    tr.querySelector('.pQty').value = maxQty;
+  }
+  
+  const finalQty = Number(tr.querySelector('.pQty').value) || 0;
+  const hj = unformatRupiah(tr.querySelector('.pHJ').value) || 0;
+  tr.querySelector('.pTotal').textContent = formatNumber(finalQty * hj);
+  calcPnjGrandTotal();
+}
+
+function calcPnjGrandTotal() {
+  let g = 0;
+  document.querySelectorAll('#pnjPartBody tr').forEach(tr => {
+    const q = Number(tr.querySelector('.pQty').value) || 0;
+    const hj = unformatRupiah(tr.querySelector('.pHJ').value) || 0;
+    g += (q * hj);
+  });
+  document.getElementById('pnjGrandTotal').textContent = formatRupiah(g);
+  return g;
+}
+
+document.addEventListener('click', e => {
+  if(!e.target.closest('.autocomplete-wrapper')) {
+    document.querySelectorAll('.autocomplete-list').forEach(l => l.classList.remove('show'));
+  }
+});
+
+window.handlePenjualanSubmit = async function() {
+  try {
+    const btn = document.getElementById('btnSubmitPnj');
+    if(btn) {
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Memproses...';
+    }
+    
+    const cab = document.getElementById('pnjCabang').value;
+    const namaPelanggan = document.getElementById('pnjNamaPelanggan').value;
+    const telepon = document.getElementById('pnjTelepon').value;
+    const metodeBayar = document.getElementById('pnjMetodeBayar').value;
+    const catatan = document.getElementById('pnjCatatan').value;
+
+    if (!cab || !namaPelanggan || !metodeBayar) {
+      Toast.warning('Lengkapi: Cabang Transaksi, Nama Pelanggan, dan Metode Pembayaran');
+      if(btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Penjualan'; }
+      return;
+    }
+
+  const parts = [];
+  document.querySelectorAll('#pnjPartBody tr').forEach(tr => {
+    const nama = tr.querySelector('.pNama').value;
+    const qty = Number(tr.querySelector('.pQty').value) || 0;
+    if (nama && qty > 0) {
+      parts.push({
+        nama: nama,
+        qty: qty,
+        hargaBeli: Number(tr.querySelector('.pHB').value) || 0,
+        hargaJual: unformatRupiah(tr.querySelector('.pHJ').value) || 0,
+        subKategori: tr.querySelector('.pSubKategori').value,
+        merkBarang: tr.querySelector('.pMerkBarang').value,
+        supplier: tr.querySelector('.pSupplier').value,
+        jenisBarang: tr.querySelector('.pJenis').value
+      });
+    }
+  });
+
+    if (parts.length === 0) {
+      Toast.error('Harap masukkan minimal 1 barang penjualan.');
+      if(btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Penjualan'; }
+      return;
+    }
+
+    const payload = {
+      cabang: cab,
+      namaPelanggan: namaPelanggan,
+      telepon: telepon,
+      metodeBayar: metodeBayar,
+      catatan: catatan,
+      parts: parts,
+      createdBy: Session.getUsername()
+    };
+
+    Loading.show('Menyimpan Transaksi Penjualan...');
+
+    try {
+      const res = await API.call('savePenjualan', payload);
+      Loading.hide();
+      if (res.success) {
+        Toast.success(res.message);
+        loadPenjualanPart(); // reset form
+        const doPrint = await Modal.confirm('Cetak Nota?', 'Penjualan berhasil disimpan. Cetak struk/nota sekarang?');
+        if(doPrint) printNota(res.id);
+      } else {
+        Toast.error(res.message);
+      }
+    } catch(err) {
+      Loading.hide();
+      Toast.error('Gagal menyimpan ke server: ' + err.message);
+    } finally {
+      if(btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Penjualan'; }
+    }
+  } catch(fatalErr) {
+    alert("Terjadi kesalahan sistem: " + fatalErr.message);
+    console.error(fatalErr);
+    const btn = document.getElementById('btnSubmitPnj');
+    if(btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Penjualan'; }
+    Loading.hide();
+  }
+};
+</script>

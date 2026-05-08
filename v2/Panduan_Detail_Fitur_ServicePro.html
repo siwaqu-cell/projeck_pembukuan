@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Panduan Detail Fitur ServicePro HP v5.1</title>
+<style>
+body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:30px;color:#333}
+.wrap{max-width:1000px;margin:0 auto;background:white;border-radius:12px;padding:50px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+h1{color:#1a237e;text-align:center;font-size:30px;border-bottom:4px solid #3f51b5;padding-bottom:16px;margin-bottom:8px}
+.subtitle{text-align:center;color:#5c6bc0;margin-bottom:40px;font-style:italic}
+h2{color:#283593;font-size:22px;border-left:5px solid #3f51b5;padding-left:12px;margin-top:50px}
+.feature-box{background:#f8f9fa;border-radius:8px;padding:22px 26px;margin-bottom:22px;border-left:5px solid #7986cb}
+.feature-title{font-size:17px;font-weight:bold;color:#1a237e;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.feature-title span.num{background:#3f51b5;color:white;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+ul{margin:0;padding-left:20px}
+li{margin-bottom:7px;line-height:1.6}
+code{background:#e8eaf6;color:#283593;padding:1px 6px;border-radius:4px;font-family:Consolas,monospace}
+.tip{background:#e8f5e9;border-left:4px solid #43a047;padding:10px 14px;border-radius:6px;margin-top:12px;font-size:13px;color:#2e7d32}
+.warn{background:#fff3e0;border-left:4px solid #fb8c00;padding:10px 14px;border-radius:6px;margin-top:12px;font-size:13px;color:#e65100}
+.info{background:#e3f2fd;border-left:4px solid #1e88e5;padding:10px 14px;border-radius:6px;margin-top:12px;font-size:13px;color:#1565c0}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold;margin-left:8px}
+.new{background:#e8f5e9;color:#2e7d32}
+.baru{background:#e8eaf6;color:#283593}
+.owner{background:#ffebee;color:#c62828}
+footer{text-align:center;margin-top:50px;padding-top:20px;border-top:2px dashed #ccc;color:#9e9e9e;font-size:13px}
+@media print{body{padding:0;background:white}.wrap{box-shadow:none;padding:20px}.feature-box{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>📖 PANDUAN DETAIL FITUR SERVICEPRO HP v5.1</h1>
+<p class="subtitle">Penjelasan lengkap cara penggunaan setiap fitur — dari awal hingga terbaru</p>
+
+<!-- ============================================================ -->
+<h2>📦 A. MODUL TRANSAKSI SERVIS</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">1</span> ➕ Input Transaksi Baru (Terima HP Servis)</div>
+<ul>
+<li>Buka menu <b>Transaksi Baru</b> di sidebar kiri</li>
+<li>Isi data: Nama pelanggan, Nomor WA, Tipe HP, deskripsi kerusakan</li>
+<li>Pilih <b>Teknisi</b> yang mengerjakan dan <b>Cabang</b> penerima</li>
+<li>Tambahkan <b>Part</b> yang digunakan jika sudah diketahui. Stok otomatis terpotong</li>
+<li>Isi <b>Ongkos Kerja</b> dan pilih <b>Metode Bayar</b> (Cash / Transfer / BON)</li>
+<li>Pilih <b>Jenis Garansi</b> servis jika berlaku (LCD, Baterai, Kamera, dll)</li>
+<li>Klik <b>Simpan</b> → Nota cetak otomatis muncul di layar</li>
+</ul>
+<div class="tip">💡 Jika saat terima HP belum tahu part-nya, biarkan saja. Part bisa ditambahkan nanti lewat menu <b>Update Status → Edit Part</b>.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">2</span> 🔄 Update Status Servis</div>
+<ul>
+<li>Buka menu <b>Update Status</b>, cari transaksi by ID atau nama pelanggan</li>
+<li>Klik baris transaksi yang ingin diupdate</li>
+<li>Pilih status baru: <b>Antri → Proses → Selesai Belum Diambil → Selesai Diambil</b></li>
+<li>Saat status menjadi <b>SELESAI_DIAMBIL</b>, uang baru dianggap masuk ke Kas Harian</li>
+</ul>
+<div class="info">ℹ️ Anda juga bisa <b>mengklik baris transaksi di Dashboard</b> untuk langsung loncat ke halaman Update Status lengkap dengan data transaksi terisi otomatis.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">3</span> ✏️ Edit Transaksi & 🔩 Edit Part</div>
+<ul>
+<li>Di halaman Update Status, setelah memilih transaksi, akan muncul 3 tombol aksi</li>
+<li><b>✏️ Edit Transaksi</b> — ubah nama pelanggan, no WA, tipe HP, deskripsi kerusakan tanpa menghapus transaksi</li>
+<li><b>🔩 Edit Part</b> — tambah part baru, ubah harga/qty, atau hapus part yang salah. Laba dihitung ulang otomatis</li>
+<li><b>💳 Ubah Metode Bayar</b> — ganti dari Cash ke Transfer atau BON setelah transaksi terbuat</li>
+</ul>
+<div class="warn">⚠️ Tombol Edit dan Hapus hanya muncul untuk role <b>OWNER</b> dan <b>ADMIN</b>. Role Admin (Hanya Input) tidak bisa melihat tombol ini.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">4</span> 🗑️ Hapus / Void Transaksi <span class="badge owner">🔒 Owner/Admin</span></div>
+<ul>
+<li>Di halaman Update Status, klik tombol <b>🗑️ Hapus/Void</b></li>
+<li>Sistem akan meminta konfirmasi sebelum menghapus</li>
+<li>Setelah dikonfirmasi: stok part dikembalikan ke gudang, kas di-reverse (uang dihapus dari Buku Kas), dan transaksi ditandai BATAL</li>
+<li>Semua aksi ini dicatat di Activity Log untuk audit</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>💰 B. MODUL KEUANGAN & KASIR</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">5</span> 🏦 Manajemen Kasir Harian (Buka & Tutup Toko)</div>
+<ul>
+<li>Setiap pagi: buka menu <b>Manajemen Kasir</b>, klik <b>Buka Laci</b>, isi nominal modal awal di laci</li>
+<li>Setiap transaksi Cash/Transfer yang berstatus SELESAI_DIAMBIL otomatis masuk ke saldo laci</li>
+<li>Malam hari: klik <b>Tutup Toko / Setor ke Owner</b>, isi jumlah yang disetor, sisa uang laci tercatat rapi</li>
+<li>Bisa juga input <b>💸 Pengeluaran Toko</b> (listrik, makan, ATK). Pengeluaran ini otomatis memotong Laba Bersih di Laporan</li>
+</ul>
+<div class="tip">💡 Gunakan fitur <b>Ringkasan Tutup Toko</b> untuk tahu persis berapa yang harus disisihkan untuk supplier dan gaji teknisi sebelum menyetor ke Owner.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">6</span> 📦 Sistem BON / Piutang Pelanggan</div>
+<ul>
+<li>Saat pelanggan mengambil HP tapi belum bayar, pilih metode bayar <b>BON</b></li>
+<li>Uang <b>TIDAK</b> masuk ke Kas Harian — melainkan masuk ke <b>Buku Piutang</b></li>
+<li>Saat pelanggan datang melunasi: di Update Status, klik tombol <b>✅ Lunasi BON</b></li>
+<li>Pilih Cash atau Transfer → uang langsung masuk ke Kas Harian saat itu juga</li>
+</ul>
+<div class="warn">⚠️ Jangan ubah status ke SELESAI_DIAMBIL tanpa melunasi BON terlebih dahulu, karena akan membuat laporan kas tidak akurat.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">7</span> 🏠 Ringkasan Tutup Toko (Fitur Emas Owner)</div>
+<ul>
+<li>Buka menu <b>Ringkasan Tutup Toko</b>, pilih cabang dan tanggal</li>
+<li><b>Tabel 1 — Uang Part per Supplier:</b> Berapa uang yang harus disisihkan untuk bayar Supplier A, B, dst</li>
+<li><b>Tabel 2 — Ongkos Jasa per Teknisi:</b> Berapa total ongkos kerja yang dikumpulkan dari Teknisi A, B, dst</li>
+<li><b>Tabel 3 — Pembelian Hari ini:</b> Part yang sudah dibeli dan sudah dibayar hari ini</li>
+<li><b>Tabel 4 — Saldo Kasir:</b> Total masuk, keluar, dan saldo akhir laci</li>
+</ul>
+<div class="info">ℹ️ Rumus pembagian uang laci: <b>Uang Laci = Sisihkan Part (Supplier) + Ongkos Teknisi + Laba Toko + Modal Awal</b></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>📦 C. MODUL STOK & INVENTORI</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">8</span> 🔍 Persamaan Nama Barang (Alias) <span class="badge baru">✨ Fitur Baru</span></div>
+<ul>
+<li>Buka <b>Master Data → Tab Part/Stok</b>, klik <b>✏️ Edit</b> pada salah satu barang</li>
+<li>Di bagian bawah form, ada field baru: <b>"Persamaan / Alias Tipe HP"</b></li>
+<li>Isi dengan tipe HP yang cocok, pisahkan dengan koma: <code>A7, A12, Realme C2, Realme 3</code></li>
+<li>Klik Simpan. Kolom Persamaan langsung tampil di tabel daftar barang (warna biru)</li>
+<li>Mulai sekarang, di <b>semua form</b> (Servis, Penjualan, Transfer, Return) — kasir bisa ketik <code>A12</code> dan sistem akan menemukan <code>LCD Oppo A5S</code> secara otomatis</li>
+<li>Di dropdown autocomplete, akan muncul info tambahan: <code>🔁 A7, A12, Realme C2</code></li>
+</ul>
+<div class="tip">💡 Ini menghilangkan masalah "nama barang berbeda-beda" antar cabang. Satu nama baku, banyak tipe HP yang cocok.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">9</span> 📥 Import Persamaan Massal via CSV <span class="badge baru">✨ Fitur Baru</span></div>
+<ul>
+<li>Di tab <b>Master Data → Part/Stok</b>, klik tombol <b>📄 Template CSV</b> untuk download contoh format</li>
+<li>Buka file template di Excel. Format hanya 2 kolom: <code>NAMA_PART</code> dan <code>PERSAMAAN</code></li>
+<li>Isi baris demi baris untuk semua barang yang punya persamaan. Simpan sebagai CSV</li>
+<li>Kembali ke aplikasi, klik <b>📥 Import Persamaan CSV</b>, pilih file yang sudah diisi</li>
+<li>Klik <b>🚀 Proses Import</b>. Sistem mengupdate semua barang sekaligus dalam hitungan detik</li>
+<li>Sistem akan laporan: berapa barang berhasil diupdate, dan berapa nama yang tidak ditemukan</li>
+</ul>
+<div class="warn">⚠️ Nama barang di kolom NAMA_PART harus <b>sama persis</b> (termasuk huruf kapital) dengan nama yang ada di database sistem.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">10</span> 🔀 Transfer Cabang Multi-Item (Keranjang) <span class="badge baru">✨ Fitur Baru</span></div>
+<ul>
+<li>Buka menu <b>Transfer Cabang</b>, pilih Cabang Asal dan Cabang Tujuan</li>
+<li>Cari barang pertama via autocomplete, isi Qty, lalu klik <b>➕ Tambah</b> — barang masuk ke Keranjang</li>
+<li>Ulangi untuk barang kedua, ketiga, dan seterusnya (tanpa batas jumlah jenis)</li>
+<li>Di tabel Keranjang, jika ada yang salah, klik tombol <b>✕</b> untuk menghapus baris tersebut</li>
+<li>Jika semua sudah benar, isi Catatan transfer (opsional), lalu klik <b>💾 Simpan & Transfer Semua</b></li>
+<li>Sistem akan memproses semua barang sekaligus: stok Cabang Asal berkurang, Cabang Tujuan bertambah</li>
+</ul>
+<div class="tip">💡 Buat cabang baru bernama <b>GUDANG</b> di Master Data untuk menampung kulakan grosir. Lalu transfer ke SIB/BL menggunakan fitur ini.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">11</span> 📦 Pembelian Part (Terima Barang dari Supplier)</div>
+<ul>
+<li>Buka menu <b>Pembelian Part</b>, pilih Supplier dan Cabang penerima</li>
+<li>Cari barang dari database master (autocomplete otomatis), isi Qty dan Harga Beli</li>
+<li>Pilih status pembayaran: <b>LUNAS</b> (uang keluar dari Kas) atau <b>BON/KREDIT</b> (masuk ke Buku Hutang Supplier)</li>
+<li>Klik Simpan → stok di cabang tersebut otomatis bertambah</li>
+</ul>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">12</span> ↩️ Return Supplier</div>
+<ul>
+<li>Buka menu <b>Return Supplier</b>, pilih supplier dan part yang dikembalikan</li>
+<li>Isi alasan return dan pilih metode: <b>Cash Refund</b> (uang balik ke Kas) atau <b>Potong Hutang</b></li>
+<li>Stok di cabang otomatis berkurang sejumlah yang di-return</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>📊 D. LAPORAN & ANALITIK</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">13</span> 📊 Dashboard</div>
+<ul>
+<li>Menampilkan KPI hari ini: Total servis masuk, Total omzet, Stok hampir habis, Transaksi pending/BON</li>
+<li>Grafik performa per cabang (jika Owner)</li>
+<li><b>Klik baris transaksi mana pun</b> di tabel Dashboard → sistem langsung loncat ke Update Status dengan data transaksi terisi otomatis</li>
+<li>Filter: per cabang dan per tanggal</li>
+</ul>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">14</span> 📈 Laporan Laba Rugi <span class="badge owner">🔒 Khusus Owner</span></div>
+<ul>
+<li>Buka menu <b>Laporan Laba Rugi</b>, pilih cabang dan rentang tanggal</li>
+<li>Laporan menampilkan: Total Pemasukan Jasa, Pemasukan Penjualan, dikurangi Modal Part, Komisi Teknisi, dan Pengeluaran Toko</li>
+<li>Hasil akhir adalah <b>Laba Bersih Real (Nett Profit)</b> yang sesungguhnya masuk ke kantong Owner</li>
+<li>Bisa Export CSV dan Cetak</li>
+</ul>
+<div class="info">ℹ️ Halaman ini disembunyikan dari karyawan. Hanya Owner yang bisa melihat angka laba toko.</div>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">15</span> 🔧 Laporan Servisan (Laporan Unit Masuk)</div>
+<ul>
+<li>Daftar lengkap semua unit HP yang pernah masuk servis</li>
+<li>Filter: Cabang, Status (Antri/Proses/Selesai/Batal), Tanggal, Cari by Nama/ID</li>
+<li>Tabel ringkasan per cabang: berapa unit Antri, Proses, Selesai, Batal</li>
+<li>Kolom keuangan: H.Jual Part, Ongkos, Modal, Laba Kotor, Komisi, Laba Bersih</li>
+<li><b>Klik baris</b> → loncat ke detail Update Status transaksi tersebut</li>
+</ul>
+</div>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">16</span> 💰 Laporan Kas</div>
+<ul>
+<li>Semua transaksi kas masuk dan keluar dalam satu tabel</li>
+<li>Filter: per cabang, per tanggal, per metode bayar (Cash/Transfer)</li>
+<li>Tombol <b>💸 Input Pengeluaran</b> tersedia di sini untuk input biaya toko harian</li>
+<li>Export CSV untuk dibuka di Excel</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>🗂️ E. MASTER DATA</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">17</span> 🗂️ Kelola Master Data</div>
+<ul>
+<li><b>Tab Cabang:</b> Tambah/Edit/Nonaktifkan cabang. Tip: buat cabang "GUDANG" untuk stok pusat</li>
+<li><b>Tab Karyawan:</b> CRUD data karyawan beserta peran dan komisi (%)</li>
+<li><b>Tab Part/Stok:</b> Daftar semua barang + kolom Persamaan baru + tombol Import CSV Persamaan</li>
+<li><b>Tab Dropdown:</b> Edit isi pilihan dropdown (jenis barang, merk, kategori, supplier) — perubahan langsung aktif di semua form</li>
+<li><b>Tab Config:</b> Upload logo per cabang, nama toko, pengaturan sistem</li>
+<li><b>Tab Users (Owner Only):</b> Kelola akun login karyawan, ganti password, atur role dan cabang</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>🔐 F. KEAMANAN & HAK AKSES</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">18</span> 🔐 Sistem Role & Pembatasan Akses</div>
+<ul>
+<li><b>OWNER:</b> Semua fitur tanpa terkecuali. Bisa lihat semua cabang sekaligus</li>
+<li><b>ADMIN:</b> Semua fitur operasional + bisa Edit/Hapus Transaksi. Tidak bisa lihat Laba Rugi</li>
+<li><b>Admin (Hanya Input):</b> Hanya input transaksi, penjualan, pembelian, transfer. Tidak ada tombol Edit/Hapus/Void. Dashboard dan Laporan Laba Rugi otomatis disembunyikan dari layar mereka</li>
+<li><b>TEKNISI:</b> Hanya bisa input transaksi baru dan update status</li>
+</ul>
+<div class="info">ℹ️ Untuk mengatur role karyawan: buka <b>Master Data → Tab Users</b>, klik Edit pada akun karyawan, ubah Role-nya, klik Simpan. Karyawan perlu <b>Logout lalu Login kembali</b> agar perubahan aktif.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>🔧 G. TROUBLESHOOTING (Solusi Masalah Umum)</h2>
+
+<div class="feature-box">
+<div class="feature-title"><span class="num">19</span> ⚠️ Solusi Masalah Yang Sering Terjadi</div>
+<ul>
+<li><b>Dashboard/Laporan kosong:</b> Tekan F5 (Refresh). Jika masih kosong, buka URL <code>/dev</code> untuk versi testing</li>
+<li><b>Nota cetak tapi kosong:</b> Sudah diperbaiki dengan sistem <code>flush()</code>. Jika masih terjadi, coba refresh dan cetak ulang</li>
+<li><b>Stok tidak terpotong:</b> Pastikan nama part di transaksi sama persis dengan nama di Master Stok. Gunakan fitur Persamaan agar tidak salah ketik</li>
+<li><b>Karyawan masih bisa lihat fitur yang dilarang:</b> Minta karyawan <b>Logout lalu Login kembali</b> agar sesi baru dengan role terbaru terbaca</li>
+<li><b>Export CSV berantakan di Excel:</b> Buka Excel → Data → From Text/CSV → pilih file → pilih delimiter koma (,)</li>
+<li><b>Salah input transaksi:</b> Gunakan <b>Update Status → ✏️ Edit Transaksi</b> atau <b>🔩 Edit Part</b></li>
+<li><b>Perlu hapus transaksi sepenuhnya:</b> Gunakan <b>Update Status → 🗑️ Hapus/Void</b> (khusus Owner/Admin)</li>
+<li><b>Stok tiba-tiba salah angka:</b> Master Data → Tab Part/Stok → Edit → ubah angka Stok langsung</li>
+<li><b>Lupa password karyawan:</b> Master Data → Tab Users → Edit → ganti Password baru</li>
+</ul>
+</div>
+
+<footer>
+ServicePro HP v5.1 — Panduan Resmi Penggunaan Sistem<br>Dikembangkan bersama Antigravity AI
+</footer>
+</div>
+</body>
+</html>

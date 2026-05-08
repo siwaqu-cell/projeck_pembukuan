@@ -1,0 +1,385 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Walkthrough Lengkap ServicePro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 40px; }
+        h1 { color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin-top: 40px; }
+        h3 { color: #16a085; }
+        h4 { color: #8e44ad; }
+        pre { background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #e9ecef; }
+        code { background-color: #f8f9fa; padding: 2px 4px; border-radius: 3px; color: #e74c3c; font-family: Consolas, monospace; }
+        blockquote { border-left: 4px solid #f1c40f; padding-left: 15px; color: #555; background: #fcfbf5; padding: 15px; margin-left: 0; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .page-break { page-break-before: always; margin-top: 50px; }
+        img { max-width: 100%; height: auto; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        @media print {
+            body { padding: 0; max-width: 100%; background: white; }
+            .page-break { page-break-before: always; margin-top: 0; }
+            pre, blockquote { border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+<h1>📖 BUKU PANDUAN &amp; WALKTHROUGH SERVICEPRO HP (LENGKAP)</h1>
+<p>Dokumen ini berisi seluruh ringkasan fitur, perbaikan, dan panduan penggunaan dari awal pengembangan hingga selesai.</p>
+<hr />
+<div class="page-break"></div>
+
+<h2>Walkthrough: Efek Glowing &amp; Drop Shadow Logo</h2>
+<p>Pekerjaan telah selesai dieksekusi dengan sukses! Berikut adalah ringkasan perubahan yang telah dilakukan pada sistem.</p>
+<h2>Perubahan yang Diterapkan</h2>
+<ol>
+<li><strong>Memperbarui Sidebar Logo (<code>Scripts.html</code>)</strong></li>
+<li>Menambahkan class <code>dynamic-branch-logo</code> ke dalam <em>tag image</em> <code>&lt;img&gt;</code> saat memuat logo.</li>
+<li>
+<p>Logo di pojok kiri atas sekarang akan merender kelas CSS tersebut agar mudah dimanipulasi dengan berbagai efek warna di masa mendatang.</p>
+</li>
+<li>
+<p><strong>Memperbarui CSS Premium (<code>Styles.html</code>)</strong></p>
+</li>
+<li><strong>Efek Sidebar:</strong> Menambahkan gaya khusus untuk class <code>.dynamic-branch-logo</code>. Logo di pojok kiri atas sekarang memiliki <code>mix-blend-mode: screen</code> untuk membantu membaurkan warna <em>background</em> (abu-abu/putih) jika ada. Selain itu, logo memancarkan <em>drop-shadow</em> dengan radius warna 8px yang disesuaikan dengan cabang:<ul>
+<li>SIB: Biru Terang</li>
+<li>BL: Ungu Terang</li>
+<li>LJ: Kuning/Emas</li>
+<li>AF: Merah</li>
+</ul>
+</li>
+<li><strong>Efek Watermark:</strong> Memperbarui gaya elemen semu <code>body::after</code>. Kami menghapus filter <code>grayscale(1)</code> agar warna otentik logo tetap dipertahankan. Sebagai penggantinya, transparansi dasar dinaikkan menjadi <code>0.08</code>, diberikan <code>mix-blend-mode: screen</code> agar menyatu harmonis dengan <em>dark background</em>, dan akhirnya ditambahkan efek pendar besar (<em>drop-shadow</em> lebar 40px) dari belakang watermark sesuai dengan identitas warna cabangnya.</li>
+</ol>
+<h2>Cara Melihat Hasilnya</h2>
+<p>Cukup buka aplikasi Google Sheets Anda, pastikan link gambar logo Google Drive sudah dimasukkan di <strong>Sheet CONFIG</strong> menggunakan format yang disarankan (contoh: <code>https://drive.google.com/uc?export=view&amp;id=...</code>).
+Lalu, buka Web App Kasir dan lakukan <em>refresh</em> (tekan tombol F5). 
+Silakan ganti <em>dropdown</em> cabang untuk melihat transisi <em>glowing</em> dan perubahan warnanya!</p>
+<hr />
+<div class="page-break"></div>
+
+<h2>Walkthrough: ServicePro HP v5.2 Updates</h2>
+<p>Update ini menghadirkan sistem manajemen kas harian yang lebih ketat, pembatasan hak akses finansial, serta branding dinamis per cabang.</p>
+<h2>1. Manajemen Kas Kecil (Kasir Harian)</h2>
+<p>Menu baru <strong>💵 Manajemen Kasir</strong> telah ditambahkan untuk mengelola uang fisik di laci setiap cabang.
+- <strong>Buka Toko</strong>: Input modal awal laci di pagi hari.
+- <strong>Pengeluaran</strong>: Catat biaya operasional (misal: beli air, bensin, dll).
+- <strong>Tutup Toko</strong>: Hitung saldo akhir, tentukan jumlah setoran ke Owner, dan lihat sisa uang laci untuk besok.
+- <strong>Otomatisasi</strong>: Transaksi Service Tunai (CASH) otomatis masuk ke saldo ini. Pembelian Part <strong>tidak lagi</strong> memotong kas ini (sesuai permintaan).</p>
+<h2>2. Hak Akses Finansial (RBAC)</h2>
+<p>Keamanan data keuangan ditingkatkan:
+- <strong>Owner Only</strong>: Data <strong>Pendapatan</strong>, <strong>Laba Kotor</strong>, dan <strong>Laba Bersih</strong> kini disembunyikan dari akun Admin, Admin Limited, dan Teknisi.
+- Berlaku di Dashboard, Laporan Lengkap, dan tabel Kinerja Teknisi.</p>
+<h2>3. Branding &amp; UI Dinamis</h2>
+<ul>
+<li><strong>Active View Branch</strong>: Sistem sekarang mengingat cabang yang Anda pilih saat berpindah-pindah halaman (tidak lagi me-reset ke SIB).</li>
+<li><strong>Tombol Refresh</strong>: Tombol <code>🔄 Refresh</code> tersedia di semua dashboard untuk memperbarui data secara manual.</li>
+<li><strong>Watermark &amp; Logo</strong>:</li>
+<li>Background warna berubah otomatis sesuai cabang.</li>
+<li>Jika Anda mengupload logo ke Google Drive dan memasukkan URL-nya di <strong>Master Data &gt; Config</strong> dengan key <code>LOGO_SIB</code>, <code>LOGO_BL</code>, dsb, maka logo tersebut akan muncul sebagai <em>watermark</em> transparan di latar belakang.</li>
+</ul>
+<h2>4. Perbaikan Teknis</h2>
+<ul>
+<li><strong>Fix Dashboard Kosong</strong>: Masalah <em>parsing</em> tanggal dari Google Sheets yang menyebabkan dashboard kosong telah diperbaiki secara menyeluruh.</li>
+<li><strong>Deployment</strong>: Semua perubahan telah di-<em>push</em> dan siap digunakan.</li>
+</ul>
+<blockquote>
+<p>[!TIP]
+Segera lakukan <em>refresh</em> pada browser Anda untuk memuat versi terbaru (v5.2).</p>
+</blockquote>
+<hr />
+<div class="page-break"></div>
+
+<h2>Walkthrough: Penyelesaian &amp; Penambahan Fitur ServicePro HP v5.1</h2>
+<h2>1. Perbaikan Fitur Pembayaran Hutang Supplier</h2>
+<p><strong>Masalah</strong>: Sistem gagal menampilkan data hutang karena adanya masalah membaca format angka yang diinput manual dengan titik (misal <code>50.000</code>) dan memunculkan pesan "Luar biasa! Tidak ada hutang..." walau sebenarnya datanya memang kosong di cabang tersebut.
+<strong>Solusi</strong>:
+- Menambahkan validasi <code>Number(String(h.SISA_HUTANG).replace(/[^0-9.-]+/g,""))</code> untuk membaca angka kotor.
+- Menambahkan layar <em>fallback</em> khusus jika memang tidak ada data hutang ("Belum ada data hutang di cabang ini...").</p>
+<h2>2. Perbaikan Isu Fundamental Google Apps Script Date Serialization</h2>
+<p><strong>Masalah</strong>: Fungsi <code>getSheetData</code> yang mengambil data dengan objek <code>Date</code> asli dari Google Sheets gagal dikirim ke <em>frontend</em> (Web App) menggunakan <code>google.script.run</code> yang mengakibatkan seluruh data di-nol-kan (menjadi <code>null</code>).
+<strong>Solusi</strong>:
+- Menambahkan logika pencegat di <code>Code.gs</code> (<code>getSheetData</code>) yang mengecek <code>val instanceof Date</code> dan otomatis merubahnya menjadi teks format ISO / YYYY-MM-DD. Masalah ini teratasi secara global untuk seluruh modul aplikasi.</p>
+<h2>3. Perbaikan Bug Import Stok (Case Sensitivity)</h2>
+<p><strong>Masalah</strong>: Sistem Import Stok gagal membaca nilai Harga Beli dan Harga Jual dari file CSV karena format kapital (contoh: <code>hargaBeli</code>).
+<strong>Solusi</strong>:
+- Mengubah <code>importBatch</code> di <code>AutoHelper.gs</code> agar mendeteksi <em>key lowercase</em> dari <em>parsed</em> CSV (<code>row.hargabeli</code> dan <code>row.hargajual</code>), sehingga harga tidak lagi tercatat sebagai Rp 0.</p>
+<h2>4. Penambahan Fitur: Tanggal Beli pada Import Stok &amp; Stock Opname</h2>
+<p><strong>Masalah</strong>: Import stok via CSV selalu mencatat waktu hari ini. Fitur Stock Opname membaca Tanggal Beli Terakhir murni dari <code>SHEET_NAMES.PEMBELIAN</code>, sehingga barang hasil <em>import</em> CSV tidak memiliki tanggal beli.
+<strong>Solusi</strong>:
+- <strong>ImportStok.html</strong>: Menambahkan format opsi kolom <code>tanggal</code> (YYYY-MM-DD) pada CSV.
+- <strong>AutoHelper.gs</strong>: Menangkap <code>row.tanggal</code> dan mem-parsingnya ke dalam pencatatan.
+- <strong>RiwayatHelper.gs</strong>: Memodifikasi <code>catatRiwayatPart</code> agar menggunakan <code>data.tanggal</code> jika disediakan, bukannya <code>getTimestamp()</code>.
+- <strong>DataHelper.gs (<code>getOpnameData</code>)</strong>: Mengubah algoritma Stock Opname dari sebelumnya mengecek <code>PEMBELIAN</code> menjadi mengecek <code>RIWAYAT_PART</code> (khusus barang <code>MASUK</code>). Hal ini mengkover pembelian normal dari sistem DAN pembelian masa lalu yang di-import melalui CSV.</p>
+<h2>Verifikasi</h2>
+<p>Seluruh fungsionalitas di atas telah di-deploy menggunakan <code>clasp push</code> dan siap untuk diuji coba secara langsung oleh operasional toko.</p>
+<hr />
+<div class="page-break"></div>
+
+<h2>ServicePro HP v5.1 — Walkthrough</h2>
+<h2>✅ Apa yang Sudah Dibuat</h2>
+<p>Seluruh sistem ServicePro HP v5.1 telah selesai dibangun — <strong>29 file</strong> (14 server scripts + 15 HTML pages) dengan total ~200 KB kode.</p>
+<hr />
+<h2>📁 Struktur File</h2>
+<pre><code>f:\proyek service hp\
+├── 📄 Server Scripts (.gs) — 14 file
+│   ├── Code.gs            — Entry point, routing, utilities
+│   ├── Setup.gs           — Create 18 sheets + default data
+│   ├── DataHelper.gs      — Cascade dropdown, autocomplete
+│   ├── TransaksiHelper.gs — Multi-part transactions
+│   ├── StatusHelper.gs    — Status update, edit part, dashboard
+│   ├── PembelianHelper.gs — Purchase, return, hutang/piutang
+│   ├── MasterDataHelper.gs— CRUD all master data
+│   ├── TransferHelper.gs  — Inter-branch transfer
+│   ├── RiwayatHelper.gs   — Part history, reports
+│   ├── RoleHelper.gs      — Login, permissions
+│   ├── AutoHelper.gs      — Auto ID, sync, batch import
+│   ├── BackupHelper.gs    — Automated backup
+│   ├── ResetHelper.gs     — Data reset with confirmation
+│   └── Trigger.gs         — Edit triggers, scheduled backup
+│
+├── 🌐 Web App HTML — 15 file
+│   ├── Styles.html        — CSS design system (dark theme)
+│   ├── Scripts.html       — Common JS utilities
+│   ├── WebApp.html        — Login + sidebar + page router
+│   ├── Dashboard.html     — KPI, charts, recent data
+│   ├── ServiceForm.html   — Transaction form (multi-part)
+│   ├── StatusForm.html    — Update status + edit part
+│   ├── MasterData.html    — 4-tab CRUD (Cabang, Karyawan, Part, Config)
+│   ├── PembelianForm.html — Purchase from supplier
+│   ├── ReturnForm.html    — Return to supplier
+│   ├── TransferForm.html  — Inter-branch transfer
+│   ├── LaporanKas.html    — Cash flow report
+│   ├── LaporanStok.html   — Stock report
+│   ├── LaporanLengkap.html— Comprehensive branch report
+│   ├── RiwayatPart.html   — Part movement history
+│   └── ImportStok.html    — CSV batch import
+</code></pre>
+<hr />
+<h2>🚀 Cara Deploy</h2>
+<h3>Langkah 1: Buat Project di Google Apps Script</h3>
+<ol>
+<li>Buka <a href="https://script.google.com">script.google.com</a></li>
+<li>Klik <strong>New Project</strong></li>
+<li>Rename project menjadi "ServicePro HP"</li>
+</ol>
+<h3>Langkah 2: Buat Google Spreadsheet</h3>
+<ol>
+<li>Buka <a href="https://sheets.google.com">sheets.google.com</a></li>
+<li>Buat spreadsheet baru, rename menjadi "ServicePro HP Database"</li>
+<li>Copy <strong>Spreadsheet ID</strong> dari URL (bagian antara <code>/d/</code> dan <code>/edit</code>)</li>
+<li>Di Apps Script, buka <strong>Project Settings</strong> &gt; <strong>Script Properties</strong></li>
+<li>Tambahkan property: <code>SS_ID</code> = <code>[Spreadsheet ID Anda]</code></li>
+</ol>
+<h3>Langkah 3: Copy Semua File</h3>
+<ol>
+<li>Di Apps Script editor, hapus file <code>Code.gs</code> default</li>
+<li>Untuk setiap file <code>.gs</code> di folder proyek:</li>
+<li>Klik <strong>+</strong> &gt; <strong>Script</strong> &gt; Rename sesuai nama file (tanpa .gs)</li>
+<li>Copy-paste isi file</li>
+<li>Untuk setiap file <code>.html</code>:</li>
+<li>Klik <strong>+</strong> &gt; <strong>HTML</strong> &gt; Rename sesuai nama file (tanpa .html)</li>
+<li>Copy-paste isi file</li>
+</ol>
+<h3>Langkah 4: Jalankan Setup</h3>
+<ol>
+<li>Di Apps Script editor, pilih fungsi <code>setupAll</code> dari dropdown</li>
+<li>Klik <strong>Run</strong> (▶️)</li>
+<li>Berikan izin yang diminta (Google Sheets, Drive, Mail)</li>
+<li>Tunggu hingga setup selesai — semua 18 sheet akan dibuat</li>
+</ol>
+<h3>Langkah 5: Deploy sebagai Web App</h3>
+<ol>
+<li>Klik <strong>Deploy</strong> &gt; <strong>New deployment</strong></li>
+<li>Pilih type: <strong>Web app</strong></li>
+<li>Description: "ServicePro HP v5.1"</li>
+<li>Execute as: <strong>Me</strong></li>
+<li>Who has access: <strong>Anyone</strong> (atau sesuai kebutuhan)</li>
+<li>Klik <strong>Deploy</strong></li>
+<li>Copy URL web app</li>
+</ol>
+<h3>Langkah 6: Aktifkan Trigger</h3>
+<ul>
+<li>Jalankan fungsi <code>createAllTriggers</code> untuk mengaktifkan:</li>
+<li>Auto-sync validasi saat data berubah</li>
+<li>Backup otomatis setiap hari jam 23:00</li>
+</ul>
+<hr />
+<h2>🔐 Default Login Credentials</h2>
+<table>
+<thead>
+<tr>
+<th>Username</th>
+<th>Password</th>
+<th>Role</th>
+<th>Cabang</th>
+<th>Akses</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>admin</code></td>
+<td><code>admin123</code></td>
+<td>OWNER</td>
+<td>SEMUA</td>
+<td>Akses penuh semua cabang</td>
+</tr>
+<tr>
+<td><code>sib</code></td>
+<td><code>sib123</code></td>
+<td>ADMIN</td>
+<td>SIB</td>
+<td>Hanya cabang SIB</td>
+</tr>
+<tr>
+<td><code>bl</code></td>
+<td><code>bl123</code></td>
+<td>ADMIN</td>
+<td>BL</td>
+<td>Hanya cabang BL</td>
+</tr>
+<tr>
+<td><code>lj</code></td>
+<td><code>lj123</code></td>
+<td>ADMIN</td>
+<td>LJ</td>
+<td>Hanya cabang LJ</td>
+</tr>
+<tr>
+<td><code>af</code></td>
+<td><code>af123</code></td>
+<td>ADMIN</td>
+<td>AF</td>
+<td>Hanya cabang AF</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!WARNING]
+<strong>Segera ubah password default setelah deploy!</strong> Buka Master Data &gt; tab Users.</p>
+</blockquote>
+<hr />
+<h2>🏗️ Database: 18 Sheet</h2>
+<table>
+<thead>
+<tr>
+<th>Kategori</th>
+<th>Sheet</th>
+<th>Fungsi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Master</td>
+<td>CABANG, KARYAWAN, STOK_PART, PELANGGAN, CONFIG, USERS</td>
+<td>Data referensi</td>
+</tr>
+<tr>
+<td>Transaksi</td>
+<td>TRANSAKSI, TRANSAKSI_DETAIL, KAS_HARIAN, PIUTANG, ACTIVITY_LOG</td>
+<td>Data operasional</td>
+</tr>
+<tr>
+<td>Stok</td>
+<td>PEMBELIAN, RETURN_SUPPLIER, HUTANG_SUPPLIER, TRANSFER_PART, RIWAYAT_PART</td>
+<td>Manajemen stok</td>
+</tr>
+<tr>
+<td>Karyawan</td>
+<td>ABSENSI, PENGGAJIAN</td>
+<td>Manajemen karyawan</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>✨ Fitur Utama yang Terbangun</h2>
+<ol>
+<li><strong>🔐 Multi-Login</strong> — 5 profil login (UTAMA + 4 cabang) dengan role-based access</li>
+<li><strong>➕ Transaksi Multi-Part</strong> — Form dengan cascade dropdown 5 level, autocomplete, kalkulasi real-time</li>
+<li><strong>🔄 Update Status Fleksibel</strong> — 7 status, bisa loncat ke status manapun, edit part di tengah proses</li>
+<li><strong>📦 Pembelian Multi-Item</strong> — Input multi-item, otomatis update stok + kas/hutang</li>
+<li><strong>↩️ Return Supplier</strong> — Potong hutang otomatis</li>
+<li><strong>🔀 Transfer Cabang</strong> — Transfer stok antar cabang dengan riwayat ganda</li>
+<li><strong>📊 Dashboard</strong> — KPI animasi, chart status, metode bayar, stok rendah</li>
+<li><strong>🗂️ Master Data</strong> — 4 tab CRUD + Users management</li>
+<li><strong>💰 Laporan Kas</strong> — Filter lengkap, print-ready</li>
+<li><strong>📦 Laporan Stok</strong> — Stok saat ini + pergerakan</li>
+<li><strong>📊 Laporan Lengkap</strong> — Revenue, profit, kinerja teknisi, top pelanggan</li>
+<li><strong>📋 Riwayat Part</strong> — Tracking pergerakan part lengkap</li>
+<li><strong>📥 Import CSV</strong> — Import stok batch dengan preview</li>
+<li><strong>💾 Backup Otomatis</strong> — Setiap hari jam 23:00 ke Google Drive</li>
+<li><strong>🎨 UI Premium</strong> — Dark theme, glassmorphism, responsive, micro-animations</li>
+</ol>
+<hr />
+<h2>🔄 Alur Kerja Utama</h2>
+<pre><code>HP Diterima → Input Form Transaksi → Status: ANTRI/PROSES
+  → Teknisi Mengerjakan → Status: SEDANG_PROSES
+  → HP Selesai → Status: SELESAI_BELUM_DIAMBIL
+  → Pelanggan Bayar → Status: SELESAI_DIAMBIL ✅
+  → Atau BON → Status: SELESAI_BELUM_LUNAS 💳
+</code></pre>
+<hr />
+<div class="page-break"></div>
+
+<h2>Walkthrough: Perbaikan Nota &amp; Akses Status</h2>
+<p>Terdapat dua perbaikan krusial yang baru saja saya selesaikan berdasarkan laporan <em>bug</em> dari Anda:</p>
+<h2>1. Perbaikan Bug Cetak Nota Gagal</h2>
+<p><strong>Penyebab sebelumnya:</strong> 
+Google Sheets terkadang membutuhkan waktu sekian milidetik untuk memastikan data benar-benar tersimpan di dalam <em>cell</em>. Ketika Anda mengklik tombol "Simpan" pada transaksi, data terkirim, namun sistem terlalu cepat memanggil <em>script</em> Cetak Nota sebelum Google Sheets selesai mengunci datanya. Akibatnya, nota tampil kosong / gagal dimuat.</p>
+<p><strong>Solusi yang Diterapkan:</strong>
+Saya telah menanamkan perintah <code>SpreadsheetApp.flush()</code> tepat sebelum transaksi dinyatakan "Sukses" di layar Anda. Perintah sakti ini memaksa Google Sheets untuk mengunci dan menyimpan data detik itu juga secara paksa, sehingga saat dialog Cetak Nota muncul, datanya sudah dijamin 100% terbaca.</p>
+<h2>2. Pengembalian Akses Cepat "Update Status" di Dashboard</h2>
+<p><strong>Penyebab sebelumnya:</strong> 
+Pada versi v5 ini, fitur Update Status, Edit Part, dan Ubah Pembayaran sudah dipisahkan ke sebuah menu utuh yang lebih besar dan rapi di panel sebelah kiri (menu <strong>"🔄 Update Status"</strong>). Namun karena Anda terbiasa mengklik dari Dashboard di versi sebelumnya, Anda mengira fiturnya dihilangkan.</p>
+<p><strong>Solusi yang Diterapkan:</strong>
+Saya telah <strong>menghubungkan kembali tabel Transaksi Terbaru di Dashboard</strong>. 
+Mulai sekarang, Anda bisa langsung <strong>mengklik baris transaksi mana pun</strong> di tabel Dashboard. Begitu diklik, sistem akan langsung melompat ke halaman "Update Status" dan secara otomatis mencari ID transaksi tersebut untuk Anda, memunculkan seluruh fitur Edit Part, Ubah Status, dan Ubah Pembayaran secara seketika!</p>
+<blockquote>
+<p>[!TIP]
+Arahkan kursor Anda ke tabel "Transaksi Terbaru" di Dashboard, kursor akan berubah menjadi gambar tangan (pointer), menandakan bahwa baris tersebut kini bisa diklik layaknya tombol jalan pintas!</p>
+</blockquote>
+<hr />
+<div class="page-break"></div>
+
+<h2>Walkthrough: Fitur Transfer Cabang Multi-Item &amp; Gudang Pusat</h2>
+<p>Sistem transfer stok antar cabang Anda kini telah di-upgrade secara masif untuk mempercepat operasional! Berikut adalah hal-hal baru yang telah ditambahkan.</p>
+<h2>1. Fitur Keranjang Transfer (Multi-Item)</h2>
+<p>Sebelumnya, Anda hanya bisa memindahkan 1 jenis barang per kali klik tombol "Simpan". Sekarang, Anda bisa mengirim banyak barang sekaligus!</p>
+<h3>Cara Kerja Baru:</h3>
+<ol>
+<li>Anda memilih Cabang Asal dan Cabang Tujuan.</li>
+<li>Anda mencari barang yang ingin dikirim dan mengisi Qty.</li>
+<li>Klik tombol <strong>[➕ Tambah]</strong>. Barang tidak akan langsung dikirim, melainkan masuk ke dalam <strong>Daftar Barang Transfer (Keranjang)</strong> di bawahnya.</li>
+<li>Ulangi langkah 2 &amp; 3 untuk memasukkan banyak barang (contoh: 10 LCD berbeda, 5 lem, 3 baterai).</li>
+<li><strong>Edit/Hapus:</strong> Jika ada barang yang salah masuk daftar, Anda bisa langsung mengklik tombol <strong>[✕] Hapus</strong> di baris tersebut.</li>
+<li>Jika daftar sudah final, cukup klik <strong>[💾 Simpan &amp; Transfer Semua]</strong>. Sistem akan memproses puluhan barang tersebut dalam 1 detik!</li>
+</ol>
+<h2>2. Implementasi Gudang Pusat (Tanpa Merusak Sistem)</h2>
+<p>Sesuai permintaan Anda, kita telah menyiapkan "jalur" agar Gudang bisa mendistribusikan barang dengan rapi, <em>tanpa harus merombak aplikasi utama</em>:</p>
+<h3>Cara Membuat Gudang:</h3>
+<ol>
+<li>Buka menu <strong>🗂️ Master Data</strong>, lalu masuk ke tab <strong>Cabang</strong>.</li>
+<li>Klik <strong>[+ Tambah Cabang]</strong>.</li>
+<li>Beri ID Cabang: <code>GUDANG</code> atau <code>PUSAT</code> (Nama: Gudang Utama).</li>
+<li>Klik Simpan.
+<em>(Opsional: Anda bisa membatasi Hak Akses karyawan agar karyawan kasir tidak bisa membuka data cabang Gudang).</em></li>
+</ol>
+<h3>Alur Kerja Pembelian &amp; Distribusi:</h3>
+<ol>
+<li><strong>Kulakan / Belanja Grosir:</strong> 
+   Saat admin/owner membeli banyak barang dari Supplier, buka form <strong>Pembelian Part</strong> dan pilih cabang penerima sebagai <code>GUDANG</code>.</li>
+<li><strong>Distribusi:</strong> 
+   Saat <code>SIB</code> atau <code>BL</code> kehabisan stok dan meminta barang, buka form <strong>Transfer Cabang</strong>. </li>
+<li>Pilih Cabang Asal: <code>GUDANG</code>.</li>
+<li>Pilih Cabang Tujuan: <code>SIB</code>.</li>
+<li>Masukkan puluhan LCD/Sparepart ke dalam <strong>Keranjang Transfer</strong> (fitur baru kita).</li>
+<li>Klik Simpan, maka otomatis puluhan stok akan berpindah dari Gudang ke SIB secara instan!</li>
+</ol>
+<blockquote>
+<p>[!TIP]
+Dengan memiliki cabang "GUDANG", Anda bisa memantau sisa barang yang <em>belum didistribusikan</em> melalui menu <strong>Laporan Stok</strong>. Cukup pilih filter Cabang = GUDANG, dan Anda akan melihat aset barang mati yang masih tertumpuk di gudang pusat!</p>
+</blockquote>
+<hr /></body></html>

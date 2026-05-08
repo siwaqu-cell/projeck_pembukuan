@@ -1,0 +1,88 @@
+<!-- riwayatlog.html - Activity Log Viewer -->
+<script>
+var logAllData = [];
+var logPage = 1;
+var logPerPage = 25;
+var logTimer = null;
+
+function debounceLog() {
+  if (logTimer) clearTimeout(logTimer);
+  logTimer = setTimeout(function() { loadLogPage(); }, 300);
+}
+
+function loadLogPage(page) {
+  if (page !== undefined) logPage = page;
+  var cab = getCab();
+  var cabOpts = '<option value="">Semua Cabang</option>';
+  if (cab) cabOpts += '<option value="'+escapeHtml(cab)+'" selected>'+escapeHtml(cab)+'</option>';
+  var aksiOpts = '<option value="">Semua Aksi</option><option value="LOGIN">Login</option><option value="TRANSAKSI">Transaksi</option><option value="UPDATE_STATUS">Update Status</option><option value="PEMBELIAN">Pembelian</option><option value="TRANSFER">Transfer</option><option value="IMPORT">Import</option><option value="TAMBAH_PART">Tambah Part</option><option value="HAPUS_PART">Hapus Part</option><option value="RETURN">Return</option><option value="VOID">Void</option><option value="BATAL">Batal</option><option value="LUNASI_BON">Lunasi BON</option><option value="RESET">Reset</option><option value="BACKUP">Backup</option>';
+
+  document.getElementById('pageContent').innerHTML =
+    '<div class="page-header"><h1 class="page-title">📋 Riwayat Log Aktivitas</h1><p style="color:var(--text-muted);font-size:13px;margin-top:4px">Monitor semua aktivitas pengguna</p></div>' +
+    '<div class="filters-row">' +
+    '<select id="logCabang" class="form-control" onchange="loadLogPage()">'+cabOpts+'</select>' +
+    '<select id="logAksi" class="form-control" onchange="loadLogPage()">'+aksiOpts+'</select>' +
+    '<input type="text" id="logSearch" class="form-control" placeholder="🔍 Cari user atau detail..." oninput="debounceLog()">' +
+    '<input type="date" id="logTanggalStart" class="form-control" onchange="loadLogPage()">' +
+    '<input type="date" id="logTanggalEnd" class="form-control" onchange="loadLogPage()">' +
+    '</div>' +
+    '<div id="logCount" style="color:var(--text-muted);font-size:13px;margin:8px 0"></div>' +
+    '<div class="table-container"><table class="data-table"><thead><tr><th style="width:140px">Waktu</th><th style="width:100px">User</th><th style="width:130px">Aksi</th><th>Detail</th><th style="width:90px">Cabang</th><th style="width:100px">Ref ID</th></tr></thead><tbody id="logTbody"></tbody></table></div>' +
+    '<div id="logPagination"></div>';
+
+  fetchLogData();
+}
+
+function fetchLogData() {
+  var filter = {
+    cabang: document.getElementById('logCabang').value,
+    aksi: document.getElementById('logAksi').value,
+    search: document.getElementById('logSearch').value,
+    tanggalStart: document.getElementById('logTanggalStart').value,
+    tanggalEnd: document.getElementById('logTanggalEnd').value
+  };
+  Loading.show('Memuat log...');
+  API.call('getActivityLogs', filter).then(function(data) {
+    logAllData = data || [];
+    renderLogTable();
+    Loading.hide();
+  }).catch(function(e) { Loading.hide(); Toast.error('Error: ' + e.message); });
+}
+
+function renderLogTable() {
+  var tbody = document.getElementById('logTbody');
+  if (!tbody) return;
+  var total = logAllData.length;
+  var totalPages = Math.ceil(total / logPerPage) || 1;
+  if (logPage > totalPages) logPage = totalPages;
+  var start = (logPage - 1) * logPerPage;
+  var end = Math.min(start + logPerPage, total);
+  var rows = logAllData.slice(start, end);
+  var countEl = document.getElementById('logCount');
+  if (countEl) countEl.textContent = 'Total: ' + total + ' log';
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">Tidak ada data log</td></tr>';
+    return;
+  }
+  var html = '';
+  rows.forEach(function(r) {
+    var tgl = '-';
+    try {
+      if (r.TIMESTAMP) {
+        if (r.TIMESTAMP instanceof Date) {
+          tgl = String(r.TIMESTAMP.getDate()).padStart(2,'0')+'/'+String(r.TIMESTAMP.getMonth()+1).padStart(2,'0')+'/'+r.TIMESTAMP.getFullYear()+' '+String(r.TIMESTAMP.getHours()).padStart(2,'0')+':'+String(r.TIMESTAMP.getMinutes()).padStart(2,'0');
+        } else { tgl = String(r.TIMESTAMP); }
+      }
+    } catch(e) { tgl = String(r.TIMESTAMP || '-'); }
+    html += '<tr><td style="font-size:12px;white-space:nowrap">'+escapeHtml(tgl)+'</td><td><strong>'+escapeHtml(r.USER||'-')+'</strong></td><td>'+getAksiBadge(r.AKSI||'')+'</td><td style="font-size:12px;max-width:300px" class="wrap-cell">'+escapeHtml(r.DETAIL||'-')+'</td><td style="font-size:12px">'+escapeHtml(r.CABANG||'-')+'</td><td style="font-size:12px;color:var(--text-muted)">'+escapeHtml(r.ID_REFERENSI||'-')+'</td></tr>';
+  });
+  tbody.innerHTML = html;
+  var pagEl = document.getElementById('logPagination');
+  if (pagEl) renderPagination('logPagination', logPage, totalPages, 'renderLogTable');
+}
+
+function getAksiBadge(aksi) {
+  var c = ({'LOGIN':'#22c55e','TRANSAKSI':'#3b82f6','UPDATE_STATUS':'#f59e0b','PEMBELIAN':'#8b5cf6','TRANSFER':'#06b6d4','IMPORT':'#ec4899','TAMBAH_PART':'#22c55e','HAPUS_PART':'#ef4444','RETURN':'#f97316','VOID':'#ef4444','BATAL':'#ef4444','LUNASI_BON':'#10b981','RESET':'#dc2626','BACKUP':'#6366f1'})[aksi] || '#6b7280';
+  return '<span style="background:'+c+'22;color:'+c+';padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap">'+escapeHtml(aksi)+'</span>';
+}
+</script>

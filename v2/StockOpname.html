@@ -1,0 +1,265 @@
+<!-- StockOpname.html — Modul Stock Opname & Cek Fisik -->
+<style>
+  .so-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .so-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  
+  .so-print-table th, .so-print-table td {
+    border: 1px solid var(--border-glass);
+    padding: 8px 12px;
+  }
+  
+  .so-print-table th {
+    background: rgba(255,255,255,0.05);
+    font-weight: 600;
+  }
+  
+  .so-group-row td {
+    border-top: 2px solid var(--accent-blue) !important;
+  }
+
+  /* KOTAK CENTANG CETAK SAJA */
+  .so-check-box {
+    width: 20px; height: 20px; border: 1px solid currentColor; display: inline-block;
+  }
+  
+  @media print {
+    body { background: white !important; color: black !important; }
+    .sidebar, .top-bar, .page-header, .so-filters, .toast-container, button { display: none !important; }
+    .main-content { margin: 0 !important; padding: 0 !important; }
+    .card { box-shadow: none !important; border: none !important; background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
+    
+    .so-print-table { font-size: 11px; color: black !important; border-color: black !important; }
+    .so-print-table th, .so-print-table td { border: 1px solid #000 !important; padding: 6px; }
+    .so-print-table th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; color: black !important; }
+    .so-group-row td { border-top: 3px solid #000 !important; }
+    
+    /* Header untuk Print */
+    #printHeader { display: block !important; margin-bottom: 20px; text-align: center; }
+    #printHeader h1 { font-size: 18px; margin:0; padding:0; font-weight: bold; }
+    #printHeader p { font-size: 12px; margin: 5px 0 0 0; }
+  }
+  
+  @media screen {
+    #printHeader { display: none; }
+  }
+</style>
+
+<script>
+let opnameData = [];
+
+async function loadStockOpname() {
+  const content = document.getElementById('pageContent');
+  
+  content.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">📋 Stock Opname</h1>
+        <p class="page-subtitle">Pengecekan fisik barang gudang per cabang</p>
+      </div>
+      <button class="btn btn-outline" onclick="printStockOpname()">🖨️ Cetak Lembar SO</button>
+    </div>
+
+    <div class="card so-filters">
+      <div class="form-group">
+        <label class="form-label">Cabang</label>
+        <select id="soCabang" class="form-control"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jenis Barang</label>
+        <select id="soJenis" class="form-control">
+          <option value="">-- Semua Jenis --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kategori</label>
+        <select id="soKategori" class="form-control"><option value="">-- Semua Kategori --</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Supplier</label>
+        <select id="soSupplier" class="form-control"><option value="">-- Semua Supplier --</option></select>
+      </div>
+      <div class="form-group" style="display:flex; align-items:flex-end;">
+        <button class="btn btn-primary" style="width:100%" onclick="fetchOpnameData()">Tampilkan Data</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="printHeader">
+        <h1>LEMBAR STOCK OPNAME - SERVICEPRO HP</h1>
+        <p id="printHeaderDesc"></p>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="so-print-table">
+          <thead>
+            <tr>
+              <th width="40px" class="text-center">Cek</th>
+              <th>Jenis Barang</th>
+              <th>Kategori</th>
+              <th>Supplier</th>
+              <th>Nama Barang (A-Z)</th>
+              <th>Merk</th>
+              <th>Tgl Beli</th>
+              <th class="text-right">Harga Beli</th>
+              <th class="text-center" width="60px">Sistem</th>
+              <th class="text-center" width="60px">Fisik</th>
+            </tr>
+          </thead>
+          <tbody id="soTableBody">
+            <tr><td colspan="10" class="text-center" style="padding:20px; color:var(--text-muted)">Silakan filter dan klik "Tampilkan Data"</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  // Populate dropdowns
+  try {
+    const initData = await API.call('getTransaksiFormData', Session.getCabang());
+    
+    // Cabang
+    const cabSel = document.getElementById('soCabang');
+    if (Session.isCabangLocked()) {
+      cabSel.innerHTML = `<option value="${Session.getCabang()}">${Session.getCabang()}</option>`;
+      cabSel.disabled = true;
+    } else {
+      cabSel.innerHTML = '<option value="SEMUA">-- SEMUA CABANG --</option>' + 
+        (initData.cabangList||[]).map(c => `<option value="${c.id}">${c.nama}</option>`).join('');
+      cabSel.value = Session.getCabang();
+    }
+    
+    // Supplier
+    const supSel = document.getElementById('soSupplier');
+    supSel.innerHTML += (initData.supplierList||[]).map(s => `<option value="${s}">${s}</option>`).join('');
+    
+    // Jenis Barang
+    const jnsSel = document.getElementById('soJenis');
+    const allStok = initData.stokList || [];
+    const uniqueJenis = [...new Set(allStok.map(s => s.jenisBarang).filter(v => v))].sort();
+    jnsSel.innerHTML = '<option value="">-- Semua Jenis --</option>' + 
+      uniqueJenis.map(j => `<option value="${j}">${j}</option>`).join('');
+      
+    // Kategori cascade
+    const katSel = document.getElementById('soKategori');
+    const updateKategori = () => {
+      const v = jnsSel.value;
+      const filtered = v ? allStok.filter(s => s.jenisBarang === v) : allStok;
+      const uniqueKat = [...new Set(filtered.map(s => s.subKategori).filter(x => x))].sort();
+      katSel.innerHTML = '<option value="">-- Semua Kategori --</option>' + 
+        uniqueKat.map(k => `<option value="${k}">${k}</option>`).join('');
+    };
+    
+    jnsSel.addEventListener('change', updateKategori);
+    updateKategori(); // populate initially
+    
+  } catch(e) {
+    Toast.error('Gagal memuat filter: ' + e.message);
+  }
+}
+
+async function fetchOpnameData() {
+  const cab = document.getElementById('soCabang').value;
+  const jns = document.getElementById('soJenis').value;
+  const kat = document.getElementById('soKategori').value;
+  const sup = document.getElementById('soSupplier').value;
+  
+  Loading.show('Mengambil data Stok & Riwayat Pembelian...');
+  try {
+    const result = await API.call('getOpnameData', {
+      cabang: cab === 'SEMUA' ? '' : cab,
+      jenis: jns,
+      kategori: kat,
+      supplier: sup
+    });
+    
+    if (result && result.success) {
+      opnameData = result.data;
+      renderOpnameTable();
+      
+      // Set Print Header
+      const ph = document.getElementById('printHeaderDesc');
+      const now = new Date().toLocaleString('id-ID');
+      ph.innerHTML = `Cabang: <strong>${cab}</strong> | Jenis: ${jns||'SEMUA'} | Kategori: ${kat||'SEMUA'} | Supplier: ${sup||'SEMUA'}<br>Dicetak pada: ${now} oleh ${Session.getUsername()}`;
+      
+      Toast.success('Data berhasil dimuat');
+    } else {
+      Toast.error(result?.message || 'Gagal mengambil data');
+    }
+  } catch(e) {
+    Toast.error('Error: ' + e.message);
+  }
+  Loading.hide();
+}
+
+function renderOpnameTable() {
+  const tbody = document.getElementById('soTableBody');
+  if (!opnameData || opnameData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding:20px;">Tidak ada data yang cocok dengan filter.</td></tr>';
+    return;
+  }
+  
+  let html = '';
+  let prevJenis = null;
+  let prevKategori = null;
+  let prevSupplier = null;
+  
+  opnameData.forEach((row, i) => {
+    // Check if group changed
+    const isJenisChanged = prevJenis !== row.JENIS_BARANG;
+    const isSupplierChanged = prevSupplier !== row.SUPPLIER;
+    const isKategoriChanged = prevKategori !== row.SUB_KATEGORI;
+    
+    const isGroupChange = isJenisChanged || isSupplierChanged || isKategoriChanged;
+    
+    let rowClass = isGroupChange && i > 0 ? 'so-group-row' : '';
+    
+    html += `
+      <tr class="${rowClass}">
+        <td class="text-center"><span class="so-check-box"></span></td>
+        <td>${row.JENIS_BARANG || '-'}</td>
+        <td>${row.SUB_KATEGORI || '-'}</td>
+        <td>${row.SUPPLIER || '-'}</td>
+        <td style="font-weight:600">${row.NAMA_PART}</td>
+        <td>${row.MERK_BARANG || '-'}</td>
+        <td>${row.TGL_BELI_TERAKHIR || '-'}</td>
+        <td class="text-right">${formatRupiah(row.HARGA_BELI)}</td>
+        <td class="text-center" style="font-weight:bold; font-size:14px;">${row.STOK}</td>
+        <td class="text-center"></td>
+      </tr>
+    `;
+    
+    prevJenis = row.JENIS_BARANG;
+    prevKategori = row.SUB_KATEGORI;
+    prevSupplier = row.SUPPLIER;
+  });
+  
+  tbody.innerHTML = html;
+}
+
+/**
+ * Cetak Stock Opname — WAJIB bersihkan #printAreaContainer (nota) dulu
+ * agar CSS nota tidak menimpa tampilan tabel stock opname.
+ */
+function printStockOpname() {
+  // Bersihkan area nota jika fungsi tersedia (dimuat dari NotaHelper.html)
+  if (typeof clearPrintArea === 'function') {
+    clearPrintArea();
+  } else {
+    // Fallback: bersihkan manual
+    const el = document.getElementById('printAreaContainer');
+    if (el) el.innerHTML = '';
+  }
+  // Beri jeda kecil agar DOM ter-update, lalu print
+  setTimeout(function() { window.print(); }, 150);
+}
+</script>

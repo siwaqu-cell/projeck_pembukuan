@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ServicePro HP — Sistem Manajemen Service</title>
+  <meta name="description" content="Sistem Manajemen Service HP Multi-Cabang — ServicePro HP v5.3">
+  <?!= include('Styles') ?>
+</head>
+<body>
+  <!-- Login Page -->
+  <div id="loginPage" class="login-container fade-up" style="display:none">
+    <!-- 4-logo animated background -->
+    <div class="login-bg-logos" id="loginBgLogos">
+      <div class="login-bg-logo-cell"><span style="font-size:80px;opacity:0.15">📱</span></div>
+      <div class="login-bg-logo-cell"><span style="font-size:80px;opacity:0.15">⚡</span></div>
+      <div class="login-bg-logo-cell"><span style="font-size:80px;opacity:0.15">🛠️</span></div>
+      <div class="login-bg-logo-cell"><span style="font-size:80px;opacity:0.15">🔧</span></div>
+    </div>
+    <!-- Center vignette -->
+    <div class="login-center-glow"></div>
+
+    <div class="login-card">
+      <div class="login-logo">
+        <!-- Mini 4-logo grid -->
+        <div class="login-logo-grid" id="loginLogoGrid">
+          <div class="login-logo-cell">📱</div>
+          <div class="login-logo-cell">⚡</div>
+          <div class="login-logo-cell">🛠️</div>
+          <div class="login-logo-cell">🔧</div>
+        </div>
+        <h1>ServicePro HP</h1>
+        <p>Sistem Manajemen Service Multi-Cabang v5.3</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group stagger-row" style="animation-delay:0.1s">
+          <label class="form-label required">Username</label>
+          <input type="text" id="loginUsername" class="form-control" placeholder="Masukkan username" autocomplete="username" required>
+        </div>
+        <div class="form-group stagger-row" style="animation-delay:0.2s">
+          <label class="form-label required">Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="Masukkan password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg stagger-row" style="width:100%;justify-content:center;margin-top:8px;animation-delay:0.3s" id="loginBtn">
+          Masuk
+        </button>
+      </form>
+      <div class="stagger-row" style="text-align:center;margin-top:20px;font-size:12px;color:var(--text-muted);animation-delay:0.4s">
+        © 2026 ServicePro HP — v5.3
+      </div>
+    </div>
+  </div>
+
+  <!-- App Layout (hidden until login) -->
+  <div id="appLayout" class="app-container fade-up" style="display:none">
+    <!-- SEMUA watermark (4 logos, hidden by default, shown for SEMUA branch) -->
+    <div class="watermark-semua" id="watermarkSemua" style="display:none">
+      <div class="watermark-semua-cell"><span style="font-size:200px;opacity:0.1">📱</span></div>
+      <div class="watermark-semua-cell"><span style="font-size:200px;opacity:0.1">⚡</span></div>
+      <div class="watermark-semua-cell"><span style="font-size:200px;opacity:0.1">🛠️</span></div>
+      <div class="watermark-semua-cell"><span style="font-size:200px;opacity:0.1">🔧</span></div>
+    </div>
+
+    <!-- Hamburger & Top Bar -->
+    <div class="top-bar" style="position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;z-index:110;background:rgba(10, 14, 26, 0.5);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-glass);margin-left:280px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="hamburger" style="position:static;display:none" aria-label="Menu">☰</button>
+        <div id="topBranchName" style="font-weight:700;font-size:18px">ServicePro HP</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <button class="btn btn-outline btn-sm" onclick="refreshCurrentPage()">🔄 Segarkan Data</button>
+        <div id="branchLogoContainer" style="height:40px;width:40px;background:var(--bg-glass);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px">🔧</div>
+      </div>
+    </div>
+
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">🔧 ServicePro</div>
+        <div class="version">v5.3</div>
+        <div class="branch-badge utama">🌐 UTAMA</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-group-title">Utama</div>
+          <a class="nav-item" data-page="dashboard" data-feature="dashboard" onclick="navigateTo('dashboard')">
+            <span class="icon">📊</span> Dashboard
+          </a>
+          <a class="nav-item" data-page="kasir" data-feature="kasir" onclick="navigateTo('kasir')">
+            <span class="icon">💵</span> Manajemen Kasir
+          </a>
+          <a class="nav-item" data-page="transaksi" data-feature="transaksi" onclick="navigateTo('transaksi')">
+            <span class="icon">➕</span> Transaksi Baru
+          </a>
+          <a class="nav-item" data-page="penjualanpart" data-feature="transaksi" onclick="navigateTo('penjualanpart')">
+            <span class="icon">🛒</span> Penjualan Aksesoris
+          </a>
+          <a class="nav-item" data-page="status" data-feature="status" onclick="navigateTo('status')">
+            <span class="icon">🔄</span> Update Status
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Stok & Pembelian</div>
+          <a class="nav-item" data-page="pembelian" data-feature="pembelian" onclick="navigateTo('pembelian')">
+            <span class="icon">📦</span> Pembelian Part
+          </a>
+          <a class="nav-item" data-page="return" data-feature="return" onclick="navigateTo('return')">
+            <span class="icon">↩️</span> Return Supplier
+          </a>
+          <a class="nav-item" data-page="transfer" data-feature="transfer" onclick="navigateTo('transfer')">
+            <span class="icon">🔀</span> Transfer Cabang
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Data & Laporan</div>
+          <a class="nav-item" data-page="masterdata" data-feature="masterdata" onclick="navigateTo('masterdata')">
+            <span class="icon">🗂️</span> Master Data
+          </a>
+          <a class="nav-item" data-page="laporankas" data-feature="laporankas" onclick="navigateTo('laporankas')">
+            <span class="icon">💰</span> Laporan Kas
+          </a>
+          <a class="nav-item" data-page="laporanstok" data-feature="laporanstok" onclick="navigateTo('laporanstok')">
+            <span class="icon">📦</span> Laporan Stok
+          </a>
+          <a class="nav-item" data-page="stockopname" data-feature="stockopname" onclick="navigateTo('stockopname')">
+            <span class="icon">📋</span> Stock Opname
+          </a>
+          <a class="nav-item" data-page="laporanlengkap" data-feature="laporanlengkap" onclick="navigateTo('laporanlengkap')">
+            <span class="icon">📊</span> Laporan Lengkap
+          </a>
+          <a class="nav-item" data-page="laporanlabarugi" data-feature="laporanlengkap" onclick="navigateTo('laporanlabarugi')">
+            <span class="icon">📈</span> Laporan Laba Rugi
+          </a>
+          <a class="nav-item" data-page="laporanservisan" data-feature="laporanlengkap" onclick="navigateTo('laporanservisan')">
+            <span class="icon">🔧</span> Laporan Servisan
+          </a>
+          <a class="nav-item" data-page="ringkasanharian" data-feature="laporanlengkap" onclick="navigateTo('ringkasanharian')">
+            <span class="icon">🏠</span> Ringkasan Tutup Toko
+          </a>
+          <a class="nav-item" data-page="riwayatpart" data-feature="riwayatpart" onclick="navigateTo('riwayatpart')">
+            <span class="icon">📋</span> Riwayat Part
+          </a>
+          <a class="nav-item" data-page="piutang" onclick="navigateTo('piutang')">
+            <span class="icon">📝</span> Piutang / BON
+          </a>
+          <a class="nav-item" data-page="importstok" data-feature="importstok" onclick="navigateTo('importstok')">
+            <span class="icon">📥</span> Import Stok
+          </a>
+          <a class="nav-item" data-page="riwayatlog" data-feature="riwayatlog" onclick="navigateTo('riwayatlog')">
+            <span class="icon">📋</span> Riwayat Log
+          </a>
+          <div id="menuPembatalan" style="display:none;">
+            <a class="nav-item" data-page="bataltransaksi" data-feature="dashboard" onclick="navigateTo('bataltransaksi')" style="color:var(--accent-red)">
+              <span class="icon">⚠️</span> Pembatalan / Void
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="sidebarUserAvatar">U</div>
+          <div>
+            <div class="user-name" id="sidebarUserName">User</div>
+            <div class="user-role" id="sidebarUserRole">Role</div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;border-color:var(--accent-red);color:var(--accent-red)" onclick="logout()">
+          🚪 Keluar
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <div id="pageContent">
+        <!-- Pages loaded dynamically -->
+      </div>
+    </main>
+  </div>
+
+  <?!= include('Scripts') ?>
+
+  <script>
+    const INITIAL_PAGE = '<?= page ?>';
+    const INITIAL_CABANG = '<?= cabang ?>';
+
+    // Check session on load
+    document.addEventListener('DOMContentLoaded', function() {
+      // Tampilkan halaman login segera tanpa menunggu API
+      if (Session.isLoggedIn()) {
+        showApp();
+        loadPage(INITIAL_PAGE !== 'login' ? INITIAL_PAGE : 'dashboard');
+      } else {
+        document.getElementById('loginPage').style.display = 'flex';
+        document.getElementById('appLayout').style.display = 'none';
+        // Load logos di background setelah login page tampil (non-blocking)
+        setTimeout(function() {
+          API.call('getBranchLogos').then(function(logos) {
+            window.BRANCH_LOGOS = logos;
+            renderLoginLogos(logos);
+          }).catch(function() { window.BRANCH_LOGOS = {}; });
+        }, 100);
+      }
+    });
+
+    function renderLoginLogos(logos) {
+      const cabangOrder = ['SIB', 'BL', 'LJ', 'AF'];
+      const defaultEmojis = ['📱', '⚡', '🛠️', '🔧'];
+
+      // Update background cells
+      const bgCells = document.querySelectorAll('.login-bg-logo-cell');
+      bgCells.forEach(function(cell, i) {
+        const cab = cabangOrder[i];
+        const url = logos[cab];
+        if (url && url.indexOf('http') === 0) {
+          cell.innerHTML = '<img src="' + url + '">';
+        }
+      });
+
+      // Update mini grid in card
+      const gridCells = document.querySelectorAll('.login-logo-cell');
+      gridCells.forEach(function(cell, i) {
+        const cab = cabangOrder[i];
+        const url = logos[cab];
+        if (url && url.indexOf('http') === 0) {
+          cell.innerHTML = '<img src="' + url + '">';
+        }
+      });
+
+      // Update SEMUA watermark cells
+      const wCells = document.querySelectorAll('.watermark-semua-cell');
+      wCells.forEach(function(cell, i) {
+        const cab = cabangOrder[i];
+        const url = logos[cab];
+        if (url && url.indexOf('http') === 0) {
+          cell.innerHTML = '<img src="' + url + '">';
+        }
+      });
+    }
+
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value.trim();
+      if (!username || !password) { Toast.warning('Isi username dan password'); return; }
+
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Memproses...';
+
+      try {
+        const result = await API.call('login', username, password);
+        if (result.success) {
+          Session.save(result.session);
+          if (result.token) Session.saveToken(result.token);
+          Toast.success('Selamat datang, ' + result.session.nama + '!');
+          showApp();
+          if (Session.hasPermission('dashboard')) {
+            loadPage('dashboard');
+          } else {
+            loadPage('transaksi');
+          }
+        } else {
+          Toast.error(result.message);
+        }
+      } catch(err) {
+        Toast.error('Gagal login: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Masuk';
+      }
+    }
+
+    function showApp() {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('appLayout').style.display = 'flex';
+      initSidebar();
+      
+      if (Session.getRole() === 'OWNER') {
+        document.getElementById('menuPembatalan').style.display = 'block';
+      }
+    }
+
+    function loadPage(page) {
+      console.log('[ServicePro] Loading page:', page);
+      // Highlight active nav
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === page);
+      });
+
+      const content = document.getElementById('pageContent');
+      content.classList.remove('fade-up');
+      void content.offsetWidth; // Trigger reflow
+      content.classList.add('fade-up');
+      
+      content.innerHTML = `
+        <div class="page-header">
+          <div>
+            <div class="skeleton" style="height:32px;width:200px"></div>
+            <div class="skeleton" style="height:16px;width:300px;margin-top:8px"></div>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="skeleton-card skeleton"></div>
+          <div class="skeleton-card skeleton"></div>
+          <div class="skeleton-card skeleton"></div>
+          <div class="skeleton-card skeleton"></div>
+        </div>
+        <div class="card skeleton" style="height:400px;width:100%"></div>
+      `;
+
+      // Load page content
+      const pageLoaders = {
+        dashboard: loadDashboard,
+        transaksi: loadTransaksi,
+        status: loadStatus,
+        masterdata: loadMasterData,
+        pembelian: loadPembelian,
+        'return': loadReturn,
+        transfer: loadTransfer,
+        laporankas: loadLaporanKas,
+        laporanstok: loadLaporanStok,
+        laporanlengkap: loadLaporanLengkap,
+        laporanlabarugi: loadLaporanLabaRugi,
+        laporanservisan: loadLaporanServisan,
+        ringkasanharian: loadRingkasanHarian,
+        riwayatpart: loadRiwayatPart,
+        importstok: loadImportStok,
+        kasir: loadKasir,
+        penjualanpart: loadPenjualanPart,
+        stockopname: loadStockOpname,
+        bataltransaksi: loadBatalTransaksi,
+        piutang: loadPiutang,
+        riwayatlog: loadLogPage
+      };
+
+      // Permission map: page -> feature key
+      const pageFeatures = {
+        dashboard:'dashboard', transaksi:'transaksi', status:'status',
+        masterdata:'masterdata', pembelian:'pembelian', 'return':'return',
+        transfer:'transfer', laporankas:'laporankas', laporanstok:'laporanstok',
+        laporanlengkap:'laporanlengkap', laporanlabarugi:'laporanlengkap',
+        laporanservisan:'laporanlengkap', ringkasanharian:'laporanlengkap',
+        riwayatpart:'riwayatpart', importstok:'importstok', kasir:'kasir',
+        penjualanpart:'transaksi', stockopname:'stockopname',
+        bataltransaksi:'dashboard', piutang:'piutang', riwayatlog:'riwayatlog'
+      };
+
+      if (pageFeatures[page] && !Session.hasPermission(pageFeatures[page])) {
+        content.innerHTML = '<div class="empty-state"><div class="icon">🚫</div><p>Anda tidak memiliki akses ke halaman ini</p></div>';
+        return;
+      }
+
+      if (pageLoaders[page]) {
+        try {
+          var result = pageLoaders[page]();
+          // Handle async functions
+          if (result && typeof result.catch === 'function') {
+            result.catch(function(err) {
+              console.error('[ServicePro] Error loading page:', page, err);
+              content.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Gagal memuat halaman: ' + (err.message || err) + '</p><button class="btn btn-primary" onclick="loadPage(\'' + page + '\')" style="margin-top:16px">🔄 Coba Lagi</button></div>';
+            });
+          }
+        } catch(err) {
+          console.error('[ServicePro] Error loading page:', page, err);
+          content.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Gagal memuat halaman: ' + (err.message || err) + '</p><button class="btn btn-primary" onclick="loadPage(\'' + page + '\')" style="margin-top:16px">🔄 Coba Lagi</button></div>';
+        }
+      } else {
+        content.innerHTML = '<div class="empty-state"><div class="icon">🚧</div><p>Halaman tidak ditemukan</p></div>';
+      }
+    }
+
+    // ======================== PAGE LOADERS ========================
+    // Each page loader is defined in its own included file below
+  </script>
+
+  <?!= include('Dashboard') ?>
+  <?!= include('ServiceForm') ?>
+  <?!= include('StatusForm') ?>
+  <?!= include('MasterData') ?>
+  <?!= include('PembelianFormV2') ?>
+  <?!= include('ReturnForm') ?>
+  <?!= include('TransferForm') ?>
+  <?!= include('LaporanKas') ?>
+  <?!= include('LaporanStok') ?>
+  <?!= include('LaporanLengkap') ?>
+  <?!= include('LaporanLabaRugi') ?>
+  <?!= include('LaporanServisan') ?>
+  <?!= include('RingkasanHarian') ?>
+  <?!= include('RiwayatPart') ?>
+  <?!= include('ImportStok') ?>
+  <?!= include('KasirForm') ?>
+  <?!= include('PenjualanForm') ?>
+  <?!= include('NotaHelper') ?>
+  <?!= include('StockOpname') ?>
+  <?!= include('BatalTransaksi') ?>
+<?!= include('Piutang') ?>
+<?!= include('riwayatlog') ?>
+
+</body>
+</html>

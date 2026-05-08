@@ -1,0 +1,238 @@
+<!-- RingkasanHarian.html — Ringkasan Tutup Toko Harian -->
+<script>
+async function loadRingkasanHarian() {
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">🏪 Ringkasan Tutup Toko</h1>
+        <p class="page-subtitle">Pisahkan uang kas: uang part per supplier, uang jasa per teknisi, saldo bersih</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="cetakRingkasan()">🖨️ Cetak</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      ${!Session.isCabangLocked() ? `
+        <div class="form-group"><label class="form-label">Cabang</label>
+          <select class="form-control" id="rhCab">
+            <option value="">Semua Cabang</option>
+          </select>
+        </div>` : ''}
+      <div class="form-group"><label class="form-label">Tanggal Awal</label>
+        <input type="date" class="form-control" id="rhTanggal" value="${getTodayStr()}">
+      </div>
+      <div class="form-group"><label class="form-label">Tanggal Akhir</label>
+        <input type="date" class="form-control" id="rhTanggalAkhir" value="${getTodayStr()}">
+      </div>
+      <div class="form-group" style="align-self:flex-end">
+        <button class="btn btn-primary" onclick="refreshRingkasan()">🔍 Tampilkan</button>
+      </div>
+    </div>
+
+    <div id="rhContent">
+      <div style="text-align:center;padding:60px;color:var(--text-muted)">
+        <div style="font-size:60px;margin-bottom:16px">🏪</div>
+        <p>Pilih Tanggal & Cabang lalu klik <strong>🔍 Tampilkan</strong></p>
+      </div>
+    </div>`;
+
+  if (!Session.isCabangLocked()) {
+    try {
+      const cl = await API.call('getCabangList');
+      const sel = document.getElementById('rhCab');
+      if (sel && cl) {
+        cl.forEach(c => {
+          const o = document.createElement('option'); o.value=c.id; o.textContent=c.id+(c.nama?' — '+c.nama:''); sel.appendChild(o);
+        });
+        const sv = Session.getActiveViewCabang();
+        if (sv && sv !== 'SEMUA') sel.value = sv;
+      }
+    } catch(e) {}
+  }
+}
+
+async function refreshRingkasan() {
+  const el = document.getElementById('rhContent');
+  const cabSel = document.getElementById('rhCab');
+  const tglEl  = document.getElementById('rhTanggal');
+  const tglAkhirEl = document.getElementById('rhTanggalAkhir');
+
+  let cab = Session.isCabangLocked() ? Session.getCabang() : (cabSel?.value || '');
+  const tgl = tglEl?.value || getTodayStr();
+  const tglAkhir = tglAkhirEl?.value || tgl;
+
+  if (cab && cab !== 'SEMUA') Session.setActiveViewCabang(cab);
+  if (typeof updateBranchStyle === 'function') updateBranchStyle(cab || 'SEMUA');
+
+  el.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="width:40px;height:40px;border-width:3px;display:inline-block"></div><p style="margin-top:12px;color:var(--text-muted)">Menghitung ringkasan...</p></div>';
+
+  try {
+    const data = await API.call('getRingkasanHarian', cab === 'SEMUA' ? '' : cab, tgl, tglAkhir);
+    if (!data) throw new Error('Tidak ada data');
+    const labelTgl = tgl === tglAkhir ? tgl : (tgl + ' s/d ' + tglAkhir);
+    renderRingkasan(data, labelTgl, cab || 'Semua Cabang');
+  } catch(err) {
+    el.innerHTML = `<div style="text-align:center;padding:40px"><p style="color:var(--accent-red)">${err.message}</p><button class="btn btn-primary" style="margin-top:12px" onclick="refreshRingkasan()">🔄 Coba Lagi</button></div>`;
+    Toast.error('Gagal: ' + err.message);
+  }
+}
+
+function renderRingkasan(data, tgl, cabLabel) {
+  const el  = document.getElementById('rhContent');
+  const r   = data.ringkasan || {};
+  const tek = data.byTeknisi || {};
+  const sup = data.bySupplierPakai || {};
+  const beli= data.bySupplierBeli || {};
+
+  // Hitung total uang yang harus disisihkan per supplier
+  const tekEntries = Object.entries(tek).sort((a,b) => b[1].ongkos - a[1].ongkos);
+  const supEntries = Object.entries(sup).sort((a,b) => b[1].modal - a[1].modal);
+  const beliEntries= Object.entries(beli).sort((a,b) => b[1].total - a[1].total);
+
+  const saldo = r.kasSaldo || 0;
+  const saldoColor = saldo >= 0 ? 'var(--accent-emerald)' : 'var(--accent-red)';
+
+  el.innerHTML = `
+    <!-- Header Ringkasan -->
+    <div class="card" style="border:1px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(168,85,247,0.05))">
+      <div style="text-align:center;padding:8px 0 16px 0">
+        <div style="font-size:32px">🏪</div>
+        <h2 style="font-size:20px;font-weight:700;margin-top:8px">Ringkasan Harian — ${cabLabel}</h2>
+        <p style="color:var(--text-muted);margin-top:4px">📅 Tanggal: <strong>${tgl}</strong> &nbsp;|&nbsp; 📦 Servis Masuk: <strong>${r.jumlahUnit || 0} unit</strong></p>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:0">
+        <div class="kpi-card"><div class="kpi-label">💰 Total Pendapatan</div><div class="kpi-value" style="color:var(--accent-emerald);font-size:20px">${formatRupiah(r.totalPendapatan||0)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Part + Ongkos Jasa</div></div>
+        <div class="kpi-card"><div class="kpi-label">🔧 Modal Part Terpakai</div><div class="kpi-value" style="color:var(--accent-red);font-size:20px">${formatRupiah(r.totalModalPakai||0)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Harus disisihkan ke Supplier</div></div>
+        <div class="kpi-card"><div class="kpi-label">👨‍🔧 Total Ongkos Jasa</div><div class="kpi-value" style="color:var(--accent-amber);font-size:20px">${formatRupiah(r.totalOngkos||0)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Jasa Teknisi</div></div>
+        <div class="kpi-card"><div class="kpi-label">📊 Laba Bersih</div><div class="kpi-value" style="color:var(--accent-cyan);font-size:20px">${formatRupiah(r.totalLaba||0)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Setelah Modal & Komisi</div></div>
+      </div>
+    </div>
+
+    <!-- SECTION: Uang Part per Supplier -->
+    <div class="card" style="border:1px solid rgba(239,68,68,0.3)">
+      <div class="card-header">
+        <h3 class="card-title" style="color:var(--accent-red)">🏭 Uang Part yang Harus Disisihkan per Supplier</h3>
+        <span style="font-size:13px;color:var(--accent-red);font-weight:700">${formatRupiah(r.totalModalPakai||0)}</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">💡 Ini adalah uang yang harus Anda sisihkan dari laci kasir untuk membayar hutang part kepada masing-masing supplier.</p>
+      ${supEntries.length ? `
+        <div class="table-container">
+          <table class="data-table">
+            <thead><tr><th>Supplier</th><th class="text-center">Qty Part Terpakai</th><th class="text-right">Modal Part</th><th class="text-right">%</th></tr></thead>
+            <tbody>
+              ${supEntries.map(([sup, v]) => {
+                const pct = r.totalModalPakai ? Math.round(v.modal/r.totalModalPakai*100) : 0;
+                return `<tr>
+                  <td style="font-weight:600">${sup}</td>
+                  <td class="text-center">${v.qty} pcs</td>
+                  <td class="text-right" style="font-weight:700;color:var(--accent-red)">${formatRupiah(v.modal)}</td>
+                  <td class="text-right"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+                    <div style="height:6px;width:${pct}px;max-width:80px;background:var(--accent-red);border-radius:3px"></div>${pct}%
+                  </div></td>
+                </tr>`;
+              }).join('')}
+              <tr style="font-weight:700;background:rgba(239,68,68,0.1)">
+                <td>TOTAL</td><td></td><td class="text-right" style="color:var(--accent-red)">${formatRupiah(r.totalModalPakai||0)}</td><td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>` : '<div style="text-align:center;padding:30px;color:var(--text-muted)">Tidak ada penggunaan part hari ini</div>'}
+    </div>
+
+    <!-- SECTION: Uang Jasa per Teknisi -->
+    <div class="card" style="border:1px solid rgba(245,158,11,0.3)">
+      <div class="card-header">
+        <h3 class="card-title" style="color:var(--accent-amber)">👨‍🔧 Uang Ongkos Jasa per Teknisi</h3>
+        <span style="font-size:13px;color:var(--accent-amber);font-weight:700">${formatRupiah(r.totalOngkos||0)}</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">💡 Ini adalah ongkos jasa yang diterima. Komisi teknisi akan dihitung dari laba kotor sesuai persentase yang ditetapkan.</p>
+      ${tekEntries.length ? `
+        <div class="table-container">
+          <table class="data-table">
+            <thead><tr><th>Teknisi</th><th class="text-center">Jumlah Servis</th><th class="text-right">Total Ongkos Jasa</th><th class="text-right">%</th></tr></thead>
+            <tbody>
+              ${tekEntries.map(([tek, v]) => {
+                const pct = r.totalOngkos ? Math.round(v.ongkos/r.totalOngkos*100) : 0;
+                return `<tr>
+                  <td style="font-weight:600">👨‍🔧 ${tek}</td>
+                  <td class="text-center">${v.jumlahServis} unit</td>
+                  <td class="text-right" style="font-weight:700;color:var(--accent-amber)">${formatRupiah(v.ongkos)}</td>
+                  <td class="text-right"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+                    <div style="height:6px;width:${pct}px;max-width:80px;background:var(--accent-amber);border-radius:3px"></div>${pct}%
+                  </div></td>
+                </tr>`;
+              }).join('')}
+              <tr style="font-weight:700;background:rgba(245,158,11,0.1)">
+                <td>TOTAL</td><td class="text-center">${r.jumlahUnit||0} unit</td><td class="text-right" style="color:var(--accent-amber)">${formatRupiah(r.totalOngkos||0)}</td><td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>` : '<div style="text-align:center;padding:30px;color:var(--text-muted)">Tidak ada data teknisi hari ini</div>'}
+    </div>
+
+    <!-- SECTION: Pembelian Part Hari Ini -->
+    ${beliEntries.length ? `
+    <div class="card" style="border:1px solid rgba(6,182,212,0.3)">
+      <div class="card-header">
+        <h3 class="card-title" style="color:var(--accent-cyan)">🛒 Pembelian Part Hari Ini (Keluar Kas)</h3>
+        <span style="font-size:13px;color:var(--accent-cyan);font-weight:700">${formatRupiah(r.totalBeliPart||0)}</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">💡 Part yang dibeli hari ini dan dibayar tunai (sudah keluar dari kas).</p>
+      <div class="table-container">
+        <table class="data-table">
+          <thead><tr><th>Supplier</th><th class="text-center">Qty</th><th class="text-right">Total Dibayar</th></tr></thead>
+          <tbody>
+            ${beliEntries.map(([sup, v]) => `<tr>
+              <td style="font-weight:600">${sup}</td>
+              <td class="text-center">${v.qty} pcs</td>
+              <td class="text-right" style="font-weight:700;color:var(--accent-cyan)">${formatRupiah(v.total)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : ''}
+
+    <!-- SECTION: Ringkasan Kas -->
+    <div class="card" style="border:1px solid rgba(16,185,129,0.3)">
+      <div class="card-header">
+        <h3 class="card-title" style="color:var(--accent-emerald)">💰 Ringkasan Saldo Kas Hari Ini</h3>
+        <span style="font-size:13px;color:${saldoColor};font-weight:700">Saldo: ${formatRupiah(saldo)}</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:0">
+        <div class="kpi-card"><div class="kpi-label">⬆️ Total Masuk</div><div class="kpi-value" style="color:var(--accent-emerald);font-size:22px">${formatRupiah(r.kasMasuk||0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">⬇️ Total Keluar</div><div class="kpi-value" style="color:var(--accent-red);font-size:22px">${formatRupiah(r.kasKeluar||0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">💰 Saldo Akhir</div><div class="kpi-value" style="color:${saldoColor};font-size:22px">${formatRupiah(saldo)}</div></div>
+      </div>
+
+      <!-- Panduan Tutup Toko -->
+      <div style="margin-top:20px;padding:16px;background:rgba(16,185,129,0.08);border-radius:12px;border:1px solid rgba(16,185,129,0.2)">
+        <h4 style="color:var(--accent-emerald);margin-bottom:12px">📋 Panduan Pembagian Uang Tutup Toko</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px">
+          <div style="padding:12px;background:rgba(239,68,68,0.1);border-radius:8px;border-left:3px solid var(--accent-red)">
+            <div style="font-weight:600;color:var(--accent-red);margin-bottom:4px">🏭 Sisihkan untuk Part</div>
+            <div style="font-size:18px;font-weight:800">${formatRupiah(r.totalModalPakai||0)}</div>
+            <div style="color:var(--text-muted);margin-top:4px;font-size:11px">Bayar ke supplier</div>
+          </div>
+          <div style="padding:12px;background:rgba(245,158,11,0.1);border-radius:8px;border-left:3px solid var(--accent-amber)">
+            <div style="font-weight:600;color:var(--accent-amber);margin-bottom:4px">👨‍🔧 Ongkos Teknisi</div>
+            <div style="font-size:18px;font-weight:800">${formatRupiah(r.totalOngkos||0)}</div>
+            <div style="color:var(--text-muted);margin-top:4px;font-size:11px">Jasa servis hari ini</div>
+          </div>
+          <div style="padding:12px;background:rgba(6,182,212,0.1);border-radius:8px;border-left:3px solid var(--accent-cyan)">
+            <div style="font-weight:600;color:var(--accent-cyan);margin-bottom:4px">💎 Laba Bersih Toko</div>
+            <div style="font-size:18px;font-weight:800">${formatRupiah(r.totalLaba||0)}</div>
+            <div style="color:var(--text-muted);margin-top:4px;font-size:11px">Profit toko hari ini</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function cetakRingkasan() {
+  if (typeof clearPrintArea === 'function') clearPrintArea();
+  setTimeout(() => window.print(), 150);
+}
+</script>

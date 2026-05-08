@@ -1,0 +1,204 @@
+<!-- NotaHelper.html — Fitur Cetak Struk / Nota Thermal -->
+<style>
+  @media screen {
+    #printAreaContainer { display: none; }
+  }
+  @media print {
+    body.print-nota-mode * { visibility: hidden !important; display: none !important; }
+    body.print-nota-mode #printAreaContainer, body.print-nota-mode #printAreaContainer * { visibility: visible !important; display: block !important; }
+    #printAreaContainer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background: white;
+      z-index: 99999;
+    }
+    .print-receipt {
+      /* Ukuran optimal untuk thermal 58mm. Jika 80mm, ubah max-width ke 72mm */
+      width: 100%;
+      max-width: 58mm;
+      margin: 0 auto;
+      font-family: "Courier New", Courier, monospace, sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #000;
+      padding: 5px;
+    }
+    .print-receipt h2 { font-size: 16px; margin: 0 0 5px 0; text-align: center; font-weight: bold; }
+    .print-receipt p { margin: 2px 0; }
+    .print-receipt .text-center { text-align: center; }
+    .print-receipt .text-right { text-align: right; }
+    .print-receipt table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    .print-receipt th, .print-receipt td { padding: 4px 0; font-size: 11px; vertical-align: top; display: table-cell !important; }
+    .print-receipt th { border-top: 1px dashed #000; border-bottom: 1px dashed #000; text-align: left; font-weight: bold; }
+    .print-receipt .total-row td { border-top: 1px dashed #000; font-weight: bold; font-size: 12px; }
+    .print-receipt .grand-total td { font-size: 14px; }
+    .print-divider { border-top: 1px dashed #000; margin: 8px 0; }
+    .print-footer { text-align: center; font-size: 11px; margin-top: 15px; }
+  }
+</style>
+
+<div id="printAreaContainer"></div>
+
+<script>
+/**
+ * Bersihkan area print nota.
+ * Dipanggil otomatis setelah print selesai/dibatalkan,
+ * atau bisa dipanggil manual oleh modul lain sebelum window.print().
+ */
+function clearPrintArea() {
+  const container = document.getElementById('printAreaContainer');
+  if (container) container.innerHTML = '';
+}
+
+// Bersihkan otomatis setiap kali dialog print ditutup
+// (baik dicetak maupun dibatalkan oleh user)
+window.addEventListener('afterprint', function() {
+  clearPrintArea();
+  document.body.classList.remove('print-nota-mode');
+});
+
+/**
+ * Panggil fungsi ini untuk mencetak struk/nota.
+ * @param {string} idTransaksi - ID Transaksi (misal: TRX-0001 atau PNJ-0001)
+ */
+async function printNota(idTransaksi) {
+  Loading.show('Menyiapkan Nota...');
+  try {
+    const data = await API.call('getNotaData', idTransaksi);
+    if (!data || !data.success) {
+      Toast.error(data?.message || 'Gagal memuat data nota');
+      Loading.hide();
+      return;
+    }
+
+    // Bersihkan dulu sebelum render nota baru
+    clearPrintArea();
+    renderNotaHtml(data.nota);
+    Loading.hide();
+    
+    // Beri jeda agar DOM selesai render sebelum memanggil print
+    setTimeout(() => {
+      document.body.classList.add('print-nota-mode');
+      window.print();
+    }, 400);
+
+  } catch(e) {
+    Toast.error('Error cetak nota: ' + e.message);
+    Loading.hide();
+  }
+}
+
+function renderNotaHtml(n) {
+  const container = document.getElementById('printAreaContainer');
+  const isTrx = n.id.startsWith('TRX');
+  
+  // Format Tanggal
+  let tgl = '-';
+  if(n.tanggal) {
+    try {
+      tgl = new Date(n.tanggal).toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+    } catch(e) { tgl = n.tanggal.substring(0, 16).replace('T', ' '); }
+  }
+  
+  let partsHtml = '';
+  if (n.parts && n.parts.length > 0) {
+    partsHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th width="45%">Item</th>
+            <th width="15%" class="text-center">Qty</th>
+            <th width="40%" class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${n.parts.map(p => `
+            <tr>
+              <td>${p.nama}</td>
+              <td class="text-center">${p.qty}</td>
+              <td class="text-right">${formatRupiah(p.hargaJual * p.qty)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  let totalsHtml = '';
+  if (isTrx) {
+    totalsHtml = `
+      <table style="margin-top:0">
+        <tbody>
+          <tr>
+            <td>Part/Aks</td>
+            <td class="text-right">${formatRupiah(n.totalPart)}</td>
+          </tr>
+          <tr>
+            <td>Ongkos Kerja</td>
+            <td class="text-right">${formatRupiah(n.ongkosKerja)}</td>
+          </tr>
+          <tr class="total-row grand-total">
+            <td>TOTAL</td>
+            <td class="text-right">${formatRupiah(n.totalPart + n.ongkosKerja)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  } else {
+    totalsHtml = `
+      <table style="margin-top:0">
+        <tbody>
+          <tr class="total-row grand-total">
+            <td>TOTAL</td>
+            <td class="text-right">${formatRupiah(n.totalPart)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  }
+
+  let serviceDetails = '';
+  if (isTrx) {
+    serviceDetails = `
+      <div class="print-divider"></div>
+      <p><strong>Tipe HP:</strong> ${n.tipeHp}</p>
+      <p><strong>Kerusakan:</strong> ${n.kerusakan}</p>
+      <p><strong>Status:</strong> ${n.status.replace(/_/g, ' ')}</p>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="print-receipt">
+      <h2>ServicePro HP</h2>
+      <p class="text-center">${n.cabang}</p>
+      <div class="print-divider"></div>
+      
+      <p>No     : ${n.id}</p>
+      <p>Tanggal: ${tgl}</p>
+      <p>Kasir  : ${n.kasir}</p>
+      ${isTrx && n.teknisi ? `<p>Teknisi: ${n.teknisi}</p>` : ''}
+      <p>Pelanggan: <strong>${n.pelanggan}</strong> ${n.telepon ? '('+n.telepon+')' : ''}</p>
+      
+      ${serviceDetails}
+      
+      <div class="print-divider"></div>
+      
+      ${partsHtml}
+      ${totalsHtml}
+      
+      <p style="margin-top:10px">Metode Bayar: <strong>${n.metodeBayar || '-'}</strong></p>
+      ${n.catatan ? `<p>Catatan: ${n.catatan}</p>` : ''}
+      
+      <div class="print-footer">
+        <p>*** TERIMA KASIH ***</p>
+        <p>Barang servis bergaransi sesuai syarat & ketentuan yang berlaku.</p>
+        <p>Harap bawa nota ini untuk klaim garansi.</p>
+      </div>
+    </div>
+  `;
+}
+</script>

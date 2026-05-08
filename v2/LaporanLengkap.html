@@ -1,0 +1,113 @@
+<!-- LaporanLengkap.html — Comprehensive Branch Report -->
+<script>
+async function loadLaporanLengkap() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">📊 Laporan Lengkap</h1><p class="page-subtitle">Laporan komprehensif per cabang</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="refreshLaporanLengkap()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="printLaporan()">🖨️ Cetak</button>
+        <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      ${!Session.isCabangLocked()?`<div class="form-group"><label class="form-label">Cabang</label>
+        <select class="form-control" id="llCab" onchange="refreshLaporanLengkap()"><option value="SEMUA">Semua</option></select></div>`:''}
+      <div class="form-group"><label class="form-label">Dari</label>
+        <input type="date" class="form-control" id="llStart" value="${getMonthStartStr()}" onchange="refreshLaporanLengkap()"></div>
+      <div class="form-group"><label class="form-label">Sampai</label>
+        <input type="date" class="form-control" id="llEnd" value="${getTodayStr()}" onchange="refreshLaporanLengkap()"></div>
+    </div>
+    <div id="llContent"><div class="empty-state"><div class="spinner" style="width:40px;height:40px;border-width:3px"></div><p style="margin-top:16px">Memuat laporan...</p></div></div>`;
+
+  if(!Session.isCabangLocked()){try{const cl=await API.call('getCabangList');const sel=document.getElementById('llCab');
+    cl.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.id+' - '+c.nama;sel.appendChild(o);});
+    if(sel) sel.value = Session.getActiveViewCabang();
+  }catch(e){}}
+  refreshLaporanLengkap();
+}
+
+async function refreshLaporanLengkap() {
+  const cabSel = document.getElementById('llCab');
+  if (cabSel && !Session.isCabangLocked()) {
+    Session.setActiveViewCabang(cabSel.value);
+  }
+  const cab = Session.getActiveViewCabang();
+  const periode = {startDate:document.getElementById('llStart')?.value, endDate:document.getElementById('llEnd')?.value};
+  const el = document.getElementById('llContent');
+  try {
+    const data = await API.call('getLaporanLengkap', cab==='SEMUA'?'':cab, periode);
+    if(!data) { el.innerHTML='<div class="empty-state"><p>Tidak ada data</p></div>'; return; }
+    const r=data.revenue||{}, e=data.expense||{}, p=data.profit||{}, k=data.kas||{};
+
+    el.innerHTML = `
+      <div style="text-align:center;margin-bottom:24px;padding:16px;background:var(--bg-glass);border-radius:12px">
+        <h2 style="font-size:20px;font-weight:700">Laporan ${cab==='SEMUA'?'Semua Cabang':cab}</h2>
+        <p style="color:var(--text-muted);font-size:13px">Periode: ${data.periode?.start||''} — ${data.periode?.end||''} | Total Servis: ${data.summary?.totalServis||0} | Total Pembelian: ${data.summary?.totalPembelian||0}</p>
+      </div>
+
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+        ${Session.getRole() === 'OWNER' ? `
+        <div class="kpi-card"><div class="kpi-label">Pendapatan</div><div class="kpi-value" style="background:var(--gradient-success);-webkit-background-clip:text">${formatRupiah(r.total)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Service: ${formatRupiah(r.service)} | Ongkos: ${formatRupiah(r.ongkos)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pengeluaran (Part)</div><div class="kpi-value" style="background:var(--gradient-danger);-webkit-background-clip:text">${formatRupiah(e.total)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Laba Bersih</div><div class="kpi-value">${formatRupiah(p.bersih)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Kotor: ${formatRupiah(p.kotor)} | Komisi: ${formatRupiah(p.komisi)}</div></div>
+        ` : `
+        <div class="kpi-card" style="grid-column: span 3; text-align:center; padding:30px">
+          <div style="color:var(--text-muted)">🔒 Informasi Pendapatan dan Laba hanya dapat diakses oleh Owner</div>
+        </div>
+        `}
+      </div>
+
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi-card"><div class="kpi-label">Kas Masuk</div><div class="kpi-value" style="font-size:22px">${formatRupiah(k.masuk)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Kas Keluar</div><div class="kpi-value" style="font-size:22px">${formatRupiah(k.keluar)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Saldo Kas</div><div class="kpi-value" style="font-size:22px">${formatRupiah(k.saldo)}</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:12px">👨‍🔧 Kinerja Teknisi</h3>
+          ${Object.keys(data.byTeknisi||{}).length>0?
+            '<table class="data-table"><thead><tr><th>Teknisi</th><th class="text-center">Servis</th>'+(Session.getRole()==='OWNER'?'<th class="text-right">Revenue</th><th class="text-right">Komisi</th>':'')+'</tr></thead><tbody>'+
+            Object.entries(data.byTeknisi).map(([t,v])=>`<tr><td>${t}</td><td class="text-center">${v.count}</td>`+(Session.getRole()==='OWNER'?`<td class="text-right">${formatRupiah(v.revenue)}</td><td class="text-right">${formatRupiah(v.komisi)}</td>`:'')+`</tr>`).join('')+
+            '</tbody></table>':'<div class="empty-state"><p>Belum ada data</p></div>'}
+        </div>
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:12px">🏆 Top 10 Pelanggan</h3>
+          ${(data.topCustomers||[]).length>0?
+            '<table class="data-table"><thead><tr><th>Pelanggan</th><th class="text-center">Kunjungan</th><th class="text-right">Total</th></tr></thead><tbody>'+
+            data.topCustomers.map(c=>`<tr><td>${c.nama}</td><td class="text-center">${c.count}</td><td class="text-right">${formatRupiah(c.total)}</td></tr>`).join('')+
+            '</tbody></table>':'<div class="empty-state"><p>Belum ada data</p></div>'}
+        </div>
+      </div>
+      
+      ${Session.getRole() === 'OWNER' ? `
+      <div class="card" style="margin-top:20px; border: 1px solid rgba(239, 68, 68, 0.3);">
+        <h3 class="card-title" style="margin-bottom:12px; color: var(--accent-red);">📉 Daftar Transaksi Rugi / Nihil Margin</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Menampilkan transaksi dengan Laba Kotor Rp 0 atau Minus (tidak termasuk transaksi yang dibatalkan).</p>
+        ${(data.rugiList||[]).length>0?
+          '<div class="table-container"><table class="data-table"><thead><tr><th>ID Transaksi</th><th>Tanggal</th><th>Pelanggan</th><th>Keterangan</th><th class="text-right">Laba Kotor</th></tr></thead><tbody>'+
+          data.rugiList.map(r=>`<tr>
+            <td style="font-family:monospace;font-size:12px">${r.id}</td>
+            <td>${r.tanggal}</td>
+            <td>${r.pelanggan}</td>
+            <td>${r.keterangan}</td>
+            <td class="text-right" style="font-weight:700; color:${r.labaKotor < 0 ? 'var(--accent-red)' : 'var(--text-muted)'}">${formatRupiah(r.labaKotor)}</td>
+          </tr>`).join('')+
+          '</tbody></table></div>':'<div class="empty-state"><p>🎉 Luar biasa! Tidak ada transaksi rugi di periode ini.</p></div>'}
+      </div>
+      ` : ''}
+    `;
+  } catch(e) { el.innerHTML = '<div class="empty-state"><p>Error: '+e.message+'</p></div>'; }
+}
+
+function printLaporan() {
+  if (typeof clearPrintArea === 'function') clearPrintArea();
+  else { var el = document.getElementById('printAreaContainer'); if (el) el.innerHTML = ''; }
+  setTimeout(function() { window.print(); }, 150);
+}
+</script>

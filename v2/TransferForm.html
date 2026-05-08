@@ -1,0 +1,329 @@
+<!-- TransferForm.html — Transfer Part Between Branches -->
+<script>
+async function loadTransfer() {
+  const cab = Session.getCabang();
+  const content = document.getElementById('pageContent');
+
+  let cabOptions = '';
+  try { const cl = await API.call('getCabangList'); cabOptions = cl.map(c=>`<option value="${c.id}">${c.id} - ${c.nama}</option>`).join(''); } catch(e){}
+
+  content.innerHTML = `
+    <div class="page-header">
+      <div><h1 class="page-title">🔀 Transfer Barang Antar Cabang</h1><p class="page-subtitle">Pindahkan stok barang (part/tool/accessories) antar cabang</p></div>
+      <button class="btn btn-outline" onclick="navigateTo('dashboard')">← Dashboard</button>
+    </div>
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:16px">📋 Data Transfer</h3>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label required">Cabang Asal</label>
+          <select class="form-control" id="tfAsal" onchange="tfAsalChanged()" ${Session.isCabangLocked()?'disabled':''}>${cabOptions}</select></div>
+        <div class="form-group"><label class="form-label required">Cabang Tujuan</label>
+          <select class="form-control" id="tfTujuan" onchange="tfTujuanChanged()">${cabOptions}</select></div>
+      </div>
+      <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group"><label class="form-label">Jenis Barang</label>
+          <select class="form-control" id="tfJenis" onchange="tfFilterChanged()"><option value="">Semua</option></select></div>
+        <div class="form-group"><label class="form-label">Kategori</label>
+          <select class="form-control" id="tfKat" onchange="tfFilterChanged()"><option value="">Semua</option></select></div>
+        <div class="form-group"><label class="form-label">Merk</label>
+          <select class="form-control" id="tfMerk" onchange="tfFilterChanged()"><option value="">Semua</option></select></div>
+        <div class="form-group"><label class="form-label">Supplier</label>
+          <select class="form-control" id="tfSup" onchange="tfFilterChanged()"><option value="">Semua</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label required">Barang</label>
+          <div class="autocomplete-wrapper" style="position:relative">
+            <input type="text" id="tfPartInput" class="form-control" placeholder="🔍 Ketik nama barang..." onfocus="showTfAutocomplete()" oninput="showTfAutocomplete()">
+            <input type="hidden" id="tfPart">
+            <div class="autocomplete-list" id="tfPartAC"></div>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label required">Qty</label>
+          <input type="number" id="tfQty" class="form-control" value="1" min="1"></div>
+        <div class="form-group" style="align-self:flex-end">
+          <button class="btn btn-secondary" onclick="addTransferItem()">➕ Tambah</button>
+        </div>
+      </div>
+      <div id="tfStokInfo" style="padding:12px;background:var(--bg-glass);border-radius:8px;font-size:13px;color:var(--text-secondary);margin-bottom:16px;display:none"></div>
+      
+      <!-- KERANJANG TRANSFER -->
+      <h4 style="margin:20px 0 10px;font-size:14px">🛒 Daftar Barang yang Akan Ditransfer</h4>
+      <div class="table-container" style="margin-bottom:16px">
+        <table class="data-table">
+          <thead><tr><th>Barang</th><th>Merk</th><th>Supplier</th><th>Kategori</th><th>Qty</th><th style="width:50px"></th></tr></thead>
+          <tbody id="tfCartBody"><tr class="empty-row"><td colspan="6" class="text-center">Belum ada barang dipilih</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="form-group"><label class="form-label">Catatan Transfer Masal</label>
+        <textarea class="form-control" id="tfCatatan" placeholder="Catatan transfer (contoh: Distribusi stok mingguan)"></textarea></div>
+      <button class="btn btn-primary btn-lg" onclick="submitTransferMasal()" style="width:100%">💾 Simpan & Transfer Semua</button>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="card-header"><h3 class="card-title">📋 Riwayat Transfer</h3></div>
+      <div id="transferHistory"></div>
+    </div>`;
+
+  if(Session.isCabangLocked()) document.getElementById('tfAsal').value = cab;
+  transferCart = []; // reset cart
+  loadTransferStok();
+  loadTransferHistory();
+}
+
+let transferCart = [];
+let transferStokList = [];
+
+function tfAsalChanged() {
+  if(transferCart.length > 0) {
+    if(!confirm('Mengubah cabang asal akan mereset barang yang sudah dipilih. Lanjutkan?')) {
+      // Revert select (too complex to revert cleanly without storing old value, so we just clear cart)
+    }
+  }
+  transferCart = [];
+  renderTransferCart();
+  loadTransferStok();
+}
+
+function tfTujuanChanged() {
+  const asal = document.getElementById('tfAsal').value;
+  const tujuan = document.getElementById('tfTujuan').value;
+  if(asal === tujuan) {
+    Toast.warning('Cabang asal dan tujuan tidak boleh sama!');
+  }
+}
+async function loadTransferStok() {
+  const asal = document.getElementById('tfAsal')?.value;
+  if(!asal) return;
+  try {
+    transferStokList = await API.call('getStokByCabang', asal);
+    // Populate cascade dropdowns
+    const jenisSet = [...new Set(transferStokList.map(s=>s.jenisBarang).filter(Boolean))].sort();
+    const katSet = [...new Set(transferStokList.map(s=>s.subKategori).filter(Boolean))].sort();
+    const merkSet = [...new Set(transferStokList.map(s=>s.merkBarang).filter(Boolean))].sort();
+    const supSet = [...new Set(transferStokList.map(s=>s.supplier).filter(Boolean))].sort();
+    document.getElementById('tfJenis').innerHTML = '<option value="">Semua</option>' + jenisSet.map(j=>`<option value="${j}">${j}</option>`).join('');
+    document.getElementById('tfKat').innerHTML = '<option value="">Semua</option>' + katSet.map(k=>`<option value="${k}">${k}</option>`).join('');
+    document.getElementById('tfMerk').innerHTML = '<option value="">Semua</option>' + merkSet.map(m=>`<option value="${m}">${m}</option>`).join('');
+    document.getElementById('tfSup').innerHTML = '<option value="">Semua</option>' + supSet.map(s=>`<option value="${s}">${s}</option>`).join('');
+    // Reset inputs
+    document.getElementById('tfPartInput').value = '';
+    document.getElementById('tfPart').value = '';
+    onTransferPartChange();
+  } catch(e) {}
+}
+
+// Filter autocomplete berdasarkan dropdown cascade
+function tfFilterChanged() {
+  document.getElementById('tfPartInput').value = '';
+  document.getElementById('tfPart').value = '';
+  document.getElementById('tfStokInfo').style.display = 'none';
+  // If all filters set and only 1 match, auto-fill
+  const filtered = getTfFilteredStok();
+  if (filtered.length === 1) {
+    document.getElementById('tfPartInput').value = filtered[0].nama;
+    document.getElementById('tfPart').value = filtered[0].id;
+    onTransferPartChange();
+  }
+}
+
+function getTfFilteredStok() {
+  const jVal = document.getElementById('tfJenis')?.value || '';
+  const kVal = document.getElementById('tfKat')?.value || '';
+  const mVal = document.getElementById('tfMerk')?.value || '';
+  const sVal = document.getElementById('tfSup')?.value || '';
+  return transferStokList.filter(s => {
+    if (s.stok <= 0) return false;
+    if (jVal && s.jenisBarang !== jVal) return false;
+    if (kVal && s.subKategori !== kVal) return false;
+    if (mVal && s.merkBarang !== mVal) return false;
+    if (sVal && s.supplier !== sVal) return false;
+    return true;
+  });
+}
+
+function onTransferPartChange() {
+  const val = document.getElementById('tfPart')?.value;
+  const info = document.getElementById('tfStokInfo');
+  if(!val) { info.style.display='none'; return; }
+  const part = transferStokList.find(s=>s.id===val);
+  if(part) {
+    info.style.display='block';
+    info.innerHTML = `<strong>${part.nama}</strong> | Jenis: ${part.jenisBarang||'-'} | Kategori: ${part.subKategori||'-'} | Merk: ${part.merkBarang||'-'} | Supplier: ${part.supplier||'-'} | Stok tersedia: <strong style="color:var(--accent-emerald)">${part.stok}</strong>`;
+    document.getElementById('tfQty').max = part.stok;
+  }
+}
+
+function showTfAutocomplete() {
+  const input = document.getElementById('tfPartInput');
+  const acList = document.getElementById('tfPartAC');
+  const q = input.value.trim().toUpperCase();
+
+  // Use cascade-filtered stok
+  const stok = getTfFilteredStok().filter(s => (!q || s.nama.toUpperCase().indexOf(q) !== -1 || (s.persamaan && s.persamaan.toUpperCase().indexOf(q) !== -1)));
+
+  if (!stok.length) {
+    acList.innerHTML = '<div class="autocomplete-item" style="color:var(--text-muted)">Tidak ada barang cocok di stok cabang asal</div>';
+    acList.classList.add('show');
+    return;
+  }
+
+  const results = stok.slice(0, 25);
+  acList.innerHTML = results.map((r, i) => {
+    return `<div class="autocomplete-item" data-idx="${i}">
+      <strong>${r.nama}</strong>
+      <span style="font-size:11px;color:var(--text-muted);margin-left:6px">${r.jenisBarang||''} | ${r.subKategori||''} | ${r.merkBarang||''} | ${r.supplier||''} | Stok: <span style="color:var(--accent-emerald)">${r.stok}</span></span>
+    </div>`;
+  }).join('');
+  acList.classList.add('show');
+
+  acList.querySelectorAll('.autocomplete-item[data-idx]').forEach((el, i) => {
+    el.onclick = () => {
+      if (i >= results.length) return;
+      const r = results[i];
+      input.value = r.nama;
+      document.getElementById('tfPart').value = r.id;
+      acList.classList.remove('show');
+      onTransferPartChange();
+    };
+  });
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.autocomplete-wrapper')) {
+    const acList = document.getElementById('tfPartAC');
+    if (acList) acList.classList.remove('show');
+  }
+});
+
+function addTransferItem() {
+  const val = document.getElementById('tfPart')?.value;
+  const qtyInput = document.getElementById('tfQty');
+  const qty = Number(qtyInput.value) || 0;
+  
+  if(!val) { Toast.warning('Pilih barang dari daftar autocomplete terlebih dahulu'); return; }
+  if(qty <= 0) { Toast.warning('Qty harus lebih dari 0'); return; }
+  
+  const asal = document.getElementById('tfAsal').value;
+  const tujuan = document.getElementById('tfTujuan').value;
+  if(!asal || !tujuan || asal === tujuan) {
+    Toast.warning('Pastikan Cabang Asal dan Tujuan sudah benar dan berbeda.');
+    return;
+  }
+
+  const part = transferStokList.find(s => s.id === val);
+  if(!part) return;
+
+  // Cek jika barang sudah ada di keranjang
+  const existingIdx = transferCart.findIndex(i => i.id === part.id);
+  const currentCartQty = existingIdx >= 0 ? transferCart[existingIdx].qty : 0;
+
+  if (currentCartQty + qty > part.stok) {
+    Toast.error('Stok di cabang asal tidak mencukupi! Sisa stok: ' + part.stok);
+    return;
+  }
+
+  if (existingIdx >= 0) {
+    transferCart[existingIdx].qty += qty;
+  } else {
+    transferCart.push({
+      id: part.id,
+      namaPart: part.nama,
+      jenisBarang: part.jenisBarang || '',
+      merkBarang: part.merkBarang || '',
+      subKategori: part.subKategori || '',
+      supplier: part.supplier || '',
+      qty: qty
+    });
+  }
+
+  // Reset input form
+  document.getElementById('tfPartInput').value = '';
+  document.getElementById('tfPart').value = '';
+  document.getElementById('tfJenis').value = '';
+  document.getElementById('tfKat').value = '';
+  document.getElementById('tfMerk').value = '';
+  document.getElementById('tfSup').value = '';
+  qtyInput.value = 1;
+  document.getElementById('tfStokInfo').style.display = 'none';
+
+  renderTransferCart();
+  Toast.info(part.nama + ' ditambahkan ke daftar');
+}
+
+function renderTransferCart() {
+  const tbody = document.getElementById('tfCartBody');
+  if(!tbody) return;
+  
+  if (transferCart.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6" class="text-center">Belum ada barang dipilih</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = transferCart.map((item, idx) => `
+    <tr>
+      <td><strong>${item.namaPart}</strong></td>
+      <td>${item.merkBarang||'-'}</td>
+      <td>${item.supplier||'-'}</td>
+      <td>${item.subKategori||'-'}</td>
+      <td class="text-center"><strong>${item.qty}</strong></td>
+      <td class="text-center"><button class="btn-remove-row" onclick="removeTransferItem(${idx})" title="Hapus">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function removeTransferItem(idx) {
+  transferCart.splice(idx, 1);
+  renderTransferCart();
+}
+
+async function submitTransferMasal() {
+  if (transferCart.length === 0) {
+    Toast.warning('Keranjang transfer masih kosong!');
+    return;
+  }
+  
+  const asal = document.getElementById('tfAsal')?.value;
+  const tujuan = document.getElementById('tfTujuan')?.value;
+  if (!asal || !tujuan || asal === tujuan) {
+    Toast.warning('Cabang asal dan tujuan tidak valid');
+    return;
+  }
+
+  const catatan = document.getElementById('tfCatatan')?.value || '';
+  
+  const data = {
+    cabangAsal: asal,
+    cabangTujuan: tujuan,
+    items: transferCart,
+    catatan: catatan,
+    createdBy: Session.getUsername()
+  };
+
+  Loading.show('Memproses transfer masal...');
+  try {
+    const result = await API.call('saveTransferMasal', data);
+    if(result.success) {
+      Toast.success(result.message);
+      loadTransfer(); // reset halaman
+    } else {
+      Toast.error(result.message);
+    }
+  } catch(e) {
+    Toast.error('Error: ' + e.message);
+  }
+  Loading.hide();
+}
+
+async function loadTransferHistory() {
+  try{
+    const data = await API.call('getTransferHistory', Session.getCabang()==='SEMUA'?'':Session.getCabang());
+    const el = document.getElementById('transferHistory');
+    if(!data||!data.length){el.innerHTML='<div class="empty-state"><p>Belum ada transfer</p></div>';return;}
+    let html='<table class="data-table"><thead><tr><th>ID</th><th>Tanggal</th><th>Asal</th><th>Tujuan</th><th>Part</th><th>Qty</th></tr></thead><tbody>';
+    data.slice(0,20).forEach(t=>{
+      html+=`<tr><td style="font-size:11px">${t.ID_TRANSFER}</td><td>${formatDateShort(t.TANGGAL)}</td><td>${t.CABANG_ASAL}</td><td>${t.CABANG_TUJUAN}</td><td>${t.NAMA_PART}</td><td>${t.QTY}</td></tr>`;
+    });
+    el.innerHTML=html+'</tbody></table>';
+  }catch(e){}
+}
+</script>

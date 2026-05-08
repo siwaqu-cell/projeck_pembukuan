@@ -1,0 +1,210 @@
+<!-- Piutang.html — Daftar Piutang / BON Pelanggan -->
+<script>
+var piutangPage = 1;
+var piutangAllData = [];
+var PIUTANG_PER_PAGE = 20;
+
+async function loadPiutang() {
+  const content = document.getElementById('pageContent');
+
+  if (Session.getRole() !== 'OWNER' && Session.getRole() !== 'ADMIN') {
+    content.innerHTML = '<div class="card" style="text-align:center;padding:50px"><div style="font-size:48px;margin-bottom:20px">🔒</div><h2>Akses Ditolak</h2><p class="text-muted">Hanya OWNER dan ADMIN yang dapat mengakses halaman Piutang.</p></div>';
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">📝 Piutang / BON Pelanggan</h1>
+        <p class="page-subtitle">Daftar transaksi yang belum dilunasi</p>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cabang</label>
+          <select class="form-control" id="piutCab" onchange="piutangPage=1;loadPiutangList()">
+            <option value="">Semua Cabang</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dari Tanggal</label>
+          <input type="date" class="form-control" id="piutStart" onchange="piutangPage=1;loadPiutangList()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sampai Tanggal</label>
+          <input type="date" class="form-control" id="piutEnd" onchange="piutangPage=1;loadPiutangList()">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cari (Nama / No HP / ID)</label>
+          <input type="text" class="form-control" id="piutSearch" placeholder="🔍 Ketik untuk cari..." oninput="piutangPage=1;loadPiutangList()">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h3 class="card-title">📋 Daftar Piutang</h3>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span id="piutInfo" style="font-size:13px;color:var(--text-muted)"></span>
+          <span id="piutTotal" style="font-weight:700;font-size:16px;color:var(--accent-amber)"></span>
+        </div>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID Transaksi</th>
+              <th>Tanggal</th>
+              <th>Pelanggan</th>
+              <th>No HP</th>
+              <th>Tipe HP</th>
+              <th>Cabang</th>
+              <th class="text-right">Nominal</th>
+              <th>Status</th>
+              <th style="width:80px">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="piutBody">
+            <tr class="empty-row"><td colspan="9" class="text-center">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="piutPagination"></div>
+    </div>
+  `;
+
+  var today = new Date();
+  var thirtyAgo = new Date(today);
+  thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+  document.getElementById('piutStart').value = thirtyAgo.toISOString().substring(0, 10);
+  document.getElementById('piutEnd').value = today.toISOString().substring(0, 10);
+
+  try {
+    var cl = await API.call('getCabangList');
+    var sel = document.getElementById('piutCab');
+    if (sel && cl) {
+      cl.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.id + ' - ' + c.nama;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+
+  piutangPage = 1;
+  loadPiutangList();
+}
+
+async function loadPiutangList() {
+  var cabang = document.getElementById('piutCab') ? document.getElementById('piutCab').value : '';
+  var startDate = document.getElementById('piutStart') ? document.getElementById('piutStart').value : '';
+  var endDate = document.getElementById('piutEnd') ? document.getElementById('piutEnd').value : '';
+  var search = document.getElementById('piutSearch') ? document.getElementById('piutSearch').value.trim().toUpperCase() : '';
+
+  Loading.show('Memuat piutang...');
+  try {
+    var data = await API.call('getPiutangList', { cabang: cabang, startDate: startDate, endDate: endDate });
+
+    var filtered = data || [];
+    if (search) {
+      filtered = filtered.filter(function(p) {
+        return (p.ID_TRANSAKSI || '').toUpperCase().indexOf(search) !== -1 ||
+               (p.NAMA_PELANGGAN || '').toUpperCase().indexOf(search) !== -1 ||
+               (p.TELEPON || '').toUpperCase().indexOf(search) !== -1 ||
+               (p.KETERANGAN || '').toUpperCase().indexOf(search) !== -1;
+      });
+    }
+
+    piutangAllData = filtered;
+    renderPiutangPage();
+  } catch(e) {
+    document.getElementById('piutBody').innerHTML = '<tr class="empty-row"><td colspan="9" class="text-center">Gagal memuat: ' + e.message + '</td></tr>';
+  }
+  Loading.hide();
+}
+
+function goToPiutangPage(page) {
+  piutangPage = page;
+  renderPiutangPage();
+  var container = document.querySelector('.table-container');
+  if (container) container.scrollTop = 0;
+}
+
+function renderPiutangPage() {
+  var tbody = document.getElementById('piutBody');
+  var totalEl = document.getElementById('piutTotal');
+  var infoEl = document.getElementById('piutInfo');
+  var filtered = piutangAllData;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9" class="text-center">Tidak ada piutang 🎉</td></tr>';
+    totalEl.textContent = '';
+    infoEl.textContent = '';
+    renderPagination('piutPagination', 1, 1, 'goToPiutangPage');
+    return;
+  }
+
+  // Calculate total piutang (only BELUM LUNAS)
+  var totalPiutang = 0;
+  for (var t = 0; t < filtered.length; t++) {
+    if (filtered[t].STATUS_BAYAR !== 'LUNAS') totalPiutang += Number(filtered[t].JUMLAH) || 0;
+  }
+  totalEl.textContent = 'Total Piutang: ' + formatRupiah(totalPiutang);
+
+  // Paginate
+  var result = paginateData(filtered, piutangPage, PIUTANG_PER_PAGE);
+  piutangPage = result.page;
+  var pageItems = result.items;
+
+  infoEl.textContent = 'Menampilkan ' + ((piutangPage-1)*PIUTANG_PER_PAGE+1) + '-' + Math.min(piutangPage*PIUTANG_PER_PAGE, result.total) + ' dari ' + result.total;
+
+  var html = '';
+  for (var i = 0; i < pageItems.length; i++) {
+    var p = pageItems[i];
+    var nominal = Number(p.JUMLAH) || 0;
+    var isLunas = p.STATUS_BAYAR === 'LUNAS';
+    var statusBadge = isLunas
+      ? '<span style="font-size:11px;background:rgba(0,200,83,0.15);color:var(--accent-emerald);padding:2px 8px;border-radius:4px">LUNAS</span>'
+      : '<span style="font-size:11px;background:rgba(245,158,11,0.15);color:var(--accent-amber);padding:2px 8px;border-radius:4px">BELUM LUNAS</span>';
+    var lunasiBtn = !isLunas
+      ? '<button class="btn btn-sm btn-success" onclick="quickLunasiPiutang(\'' + (p.ID_TRANSAKSI||'') + '\')" title="Lunasi">💵 Lunasi</button>'
+      : '-';
+
+    html += '<tr style="' + (isLunas ? 'opacity:0.5' : '') + '">' +
+      '<td style="font-size:12px">' + escapeHtml(p.ID_TRANSAKSI || '-') + '</td>' +
+      '<td style="font-size:12px">' + formatDateShort(p.TANGGAL) + '</td>' +
+      '<td><strong>' + escapeHtml(p.NAMA_PELANGGAN || '-') + '</strong></td>' +
+      '<td style="font-size:12px">' + escapeHtml(p.TELEPON || '-') + '</td>' +
+      '<td style="font-size:12px">' + escapeHtml(p.KETERANGAN || '-') + '</td>' +
+      '<td style="font-size:12px">' + escapeHtml(p.CABANG || '-') + '</td>' +
+      '<td class="text-right" style="font-weight:600;color:var(--accent-amber)">' + formatRupiah(nominal) + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td class="text-center">' + lunasiBtn + '</td>' +
+      '</tr>';
+  }
+  tbody.innerHTML = html;
+  renderPagination('piutPagination', piutangPage, result.totalPages, 'goToPiutangPage');
+}
+
+async function quickLunasiPiutang(idTrx) {
+  var konfirm = await Modal.confirm('Lunasi Piutang?', 'Lunasi piutang untuk transaksi ' + idTrx + '? Uang akan masuk ke Kas sebagai CASH.');
+  if (!konfirm) return;
+
+  Loading.show('Memproses pelunasan...');
+  try {
+    var result = await API.call('lunasiBon', idTrx, 'CASH', Session.getUsername());
+    if (result.success) {
+      Toast.success(result.message);
+      loadPiutangList();
+    } else {
+      Toast.error(result.message);
+    }
+  } catch(e) {
+    Toast.error('Error: ' + e.message);
+  }
+  Loading.hide();
+}
+</script>
